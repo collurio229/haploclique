@@ -9,13 +9,15 @@ import tempfile
 
 class Sequence:
 
-    def __init__(self, identifier, description):
+    def __init__(self, identifier, description, bases=['A', 'G', 'C', 'T']):
         self.identifier = identifier
         self.description = description
         self.sequence = ''
-        self.bases = ['A', 'G', 'C', 'T']
+        self.bases = bases
 
-        self.base_freqs = {'A': 0, 'G': 0, 'C': 0, 'T': 0}
+        self.base_freqs = dict()
+        for b in self.bases:
+            self.base_freqs[b] = 0
 
     def replicate(self):
         new_seq = Sequence(self.identifier, self.description)
@@ -31,7 +33,9 @@ class Sequence:
 
         new_len = len(seq)
 
-        new_freq = {'A' : 0, 'G' : 0, 'C': 0, 'T': 0}
+        new_freq = dict()
+        for key in self.base_freqs.keys():
+            new_freq[key] = 0
 
         for c in seq:
             new_freq[c] += 1
@@ -43,7 +47,7 @@ class Sequence:
         r = random.random()
         ct = 0
 
-        for (base, freq) in new_freq.items():
+        for (base, freq) in self.base_freqs.items():
             ct += freq
             if r < ct:
                 return base
@@ -113,17 +117,20 @@ def readFASTA(filename):
 
 def main(argv):
     parser = argparse.ArgumentParser(description='Generate haplotypes from a reference genome and create simulated illumina reads with SimSeq')
-    parser.add_argument('-i', '--input', help='the reference genome in FASTA format (REQUIRED)', metavar='reference.fasta')
+    parser.add_argument('-i', '--input', help='the reference genome in FASTA format (REQUIRED)', required=True, metavar='reference.fasta')
     parser.add_argument('-o', '--output', help='destination of the generated data tar.gz archive. It contains the reference sequence, the generated haplotypes and the simulated sam file.', metavar='output.tar.gz')
     parser.add_argument('--snp', help='generate new haplotypes through substituting random nucleotides.')
     parser.add_argument('--ins', help='generate new haplotypes through inserting random sequences.')
     parser.add_argument('--del', help='generate new haplotypes through deleting random sequences.')
-    parser.add_argument('-m', '--mean', type=int, help='mean value for length of indels or number of nucleotide substitutions')
-    parser.add_argument('-s', '--sigma', type=int, help='standard deviation for length of indels or number of nucleotide substitions')
-    parser.add_argument('-n', '--number', type=int, help='number of created haplotypes')
+    parser.add_argument('-m', '--mean', type=int, default=1, help='mean value for length of indels or number of nucleotide substitutions. Default value is 1')
+    parser.add_argument('-s', '--sigma', type=int, default=0, help='standard deviation for length of indels or number of nucleotide substitions. Default value is 0')
+    parser.add_argument('-n', '--number', type=int, default=1,help='number of created haplotypes. Default value is 1')
     parser.add_argument('--seed', type=int, help='seed for the Random Number Generator')
 
     args = parser.parse_args(argv)
+
+    if args.seed:
+        random.seed(args.seed)
 
     ref_genome = readFASTA(args.input)
 
@@ -167,11 +174,21 @@ def main(argv):
 
         haplofiles.append(f)
 
+    samfiles = []
+
     for hf in haplofiles:
 
-        call(['../bin/SimSeq.jar', #TODO 
+        f = tempfile.NamedTemporaryFile()
+        samfiles.append(f)
+        
+        call(['java', '-jar', '-Xmx2048m', '../bin/SimSeq.jar',
+                '--out', f.name,
+                '--reference', hf.name,
+                '--error', '../data/miseq_250bp.txt'])
         hf.close()
 
+    for sf in samfiles:
+        #TODO Merge simulated reads
     tar.close()
 
 if __name__ == '__main__':
