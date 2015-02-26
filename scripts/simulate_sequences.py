@@ -122,11 +122,11 @@ def main(argv):
     parser.add_argument('--snp', help='generate new haplotypes through substituting random nucleotides.')
     parser.add_argument('--ins', help='generate new haplotypes through inserting random sequences.')
     parser.add_argument('--del', help='generate new haplotypes through deleting random sequences.')
-    parser.add_argument('-m', '--mean', type=int, default=1, help='mean value for length of indels or number of nucleotide substitutions. Default value is 1')
-    parser.add_argument('-s', '--sigma', type=int, default=0, help='standard deviation for length of indels or number of nucleotide substitions. Default value is 0')
-    parser.add_argument('-n', '--number', type=int, default=1,help='number of created haplotypes. Default value is 1')
+    parser.add_argument('-m', '--mean', type=int, default=1, help='mean value for length of indels or number of nucleotide substitutions. Default: 1')
+    parser.add_argument('-s', '--sigma', type=int, default=0, help='standard deviation for length of indels or number of nucleotide substitions. Default: 0')
+    parser.add_argument('-n', '--number', type=int, default=1, help='number of created haplotypes. Default: 1')
     parser.add_argument('--seed', type=int, help='seed for the Random Number Generator')
-
+    parser.add_argument('-c', '--coverage', type=float, default=30.0, help='Average coverage for simulated reads. Default: 30')
     args = parser.parse_args(argv)
 
     if args.seed:
@@ -167,7 +167,7 @@ def main(argv):
         if args.del:
             seq.create_deletion(mean, sigma)
 
-        f = tempfile.NamedTemporaryFile()
+        f = tempfile.NamedTemporaryFile(suffix='.fasta')
         seq.writeFASTA(f)
         info = tar.gettarinfo(arcname = 'ht' + i + '_' + filename + '.fasta',fileobj=f)
         tar.addfile(info, f)
@@ -178,17 +178,28 @@ def main(argv):
 
     for hf in haplofiles:
 
-        f = tempfile.NamedTemporaryFile()
+        f = tempfile.NamedTemporaryFile(suffix='.sam')
         samfiles.append(f)
         
         call(['java', '-jar', '-Xmx2048m', '../bin/SimSeq.jar',
                 '--out', f.name,
                 '--reference', hf.name,
+                '--read_number', str(args.coverage * len(ref_genome.sequence)),
                 '--error', '../data/miseq_250bp.txt'])
         hf.close()
 
+    options = ['java', '-jar', '../bin/picard.jar', 'MergeSamFiles', 'OUTPUT=' + args.output]
+    options_sort = ['java', '-jar', '../bin/picard.jar', 'SortSam', 'SORT_ORDER=coordinate']
+
     for sf in samfiles:
-        #TODO Merge simulated reads
+        call(options_sort + ['INPUT=' + sf.name, 'OUTPUT=' + sf.name])
+        options.append('INPUT=' + sf.name)
+
+    call(options)
+
+    for sf in samfiles:
+        sf.close()
+
     tar.close()
 
 if __name__ == '__main__':
