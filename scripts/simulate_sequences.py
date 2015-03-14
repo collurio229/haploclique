@@ -91,7 +91,7 @@ class Sequence:
         for base in self.sequence:
             fileobj.write(bytes(base, 'UTF-8'))
             ct += 1
-            if ct == 80:
+            if ct == 70:
                 ct = 0
                 fileobj.write(b'\n')
 
@@ -117,6 +117,54 @@ def readFASTA(filename):
 
     return seq
 
+prog_ct = 0
+sub_ct = 0
+
+def progress(msg, done=True):
+    global prog_ct
+
+    print('[' + str(prog_ct) + ']', msg + '...')
+    if not done:
+            prog_ct += 1
+
+def subprogress_init_counter():
+    global sub_ct
+    sub_ct = 0
+
+def subprogress(num, msg='', counter=True):
+    global prog_ct, sub_ct
+
+    s = ''
+    new_msg =''
+
+    if counter:
+        s = str(sub_ct / num * 100) + '%'
+
+        m = re.split('%%', msg)
+
+        for substr in m[:-1]:
+            new_msg += substr
+            new_msg += str(sub_ct)
+
+        new_msg += m[-1]
+    else:
+        s = str(num)
+
+    print('[' + str(prog_ct) + '][' + s + ']', new_msg)
+
+    sub_ct += 1
+
+def done(msg=''):
+    global prog_ct
+
+    print('[' + str(prog_ct) + ']', 'Done.')
+    prog_ct += 1
+
+def all_done():
+    global prog_ct
+
+    print('[' + str(prog_ct) + ']', 'Finished all.')
+
 def main(argv):
     parser = argparse.ArgumentParser(description='Generate haplotypes from a reference genome and create simulated illumina reads with SimSeq')
     parser.add_argument('-i', '--input', help='the reference genome in FASTA format (REQUIRED)', required=True, metavar='reference.fasta')
@@ -135,16 +183,27 @@ def main(argv):
     if args.seed:
         random.seed(args.seed)
 
+    progress('Reading input sequence')
+
     ref_genome = readFASTA(args.input)
 
     m = re.match('(?P<name>.*)(\.fasta$)', args.input)
     filename = m.group('name')
+
+    done('Reading input sequence')
+
+    progress('Creating output file')
 
     if not args.output:
         args.output = filename + '_sht.tar.gz'
 
     tar = tarfile.open(args.output, 'w:gz')
     tar.add(args.input, arcname='ref_' + args.input)
+
+    done('Creating output file')
+
+    progress('Creating new haplotypes')
+    subprogress_init_counter()
 
     n = args.number
 
@@ -154,6 +213,9 @@ def main(argv):
         haplofiles.append(args.input)
 
     for i in range(0, n):
+
+        subprogress(n, 'Creating haplotype %%')
+
         seq = ref_genome.replicate()
 
         mean = args.mean
@@ -164,7 +226,7 @@ def main(argv):
             sigma *= len(ref_genome.sigma)
 
         if args.snp:
-            for i in range(0, int(random.gauss(mean, sigma))):
+            for j in range(0, int(random.gauss(mean, sigma))):
                 seq.create_snp()
 
         if args.insert:
@@ -180,43 +242,82 @@ def main(argv):
         
         tar.add(haplofiles[-1], arcname='ht' + str(i) + '_' + filename + '.fasta')
 
+    done('Creating new haplotypes')
+
     samfiles = []
+
+    progress('Simulating sequence reads')
+    subprogress_init_counter()
+
+    subprogress(n+1, 'Creating sequence dictionary')
+
+    call(['java', '-jar', '../bin/picard.jar', 'CreateSequenceDictionary', 'REFERENCE=' + args.input, 'OUTPUT=dict.sam'])
 
     for hf in haplofiles:
 
-        f = tempfile.NamedTemporaryFile(suffix='.sam', delete=False)
+        subprogress(n+1, 'Simulating reads for haplotype %%')
+
+        f = tempfile.NamedTemporaryFile(prefix='sort_', suffix='.sam', delete=False)
+        f2 = tempfile.NamedTemporaryFile(prefix='raw_', suffix='.sam', delete=False)
         samfiles.append(f.name)
         f.close()
+        f2.close()
 
         call(['java', '-jar', '-Xmx2048m', '../bin/SimSeq.jar',
-                '--out', f.name,
+                '--out', f2.name,
                 '--reference', hf,
                 '--read_number', str(int(args.coverage * len(ref_genome.sequence))),
                 '--error', '../data/miseq_250bp.txt'])
     
+        with open('dict.sam') as d, open(f2.name) as old_sam, open(f.name, 'w') as new_sam:
+            for line in d:
+                new_sam.write(line)
+
+            for line in old_sam:
+                new_sam.write(line)
+
+        #os.unlink(f2.name)
+
+    os.unlink('dict.sam')
+
     for hf in haplofiles:
         if hf != args.input:
             os.unlink(hf)
 
-    samf = tempfile.NamedTemporaryFile(suffix='.sam', delete=False)
+    done('Simulating sequence reads')
+
+    progress('Merging sam files')
+    subprogress_init_counter()
+
+    samf = tempfile.NamedTemporaryFile(prefix='merge_', suffix='.sam', delete=False)
     samf.close()
 
-    options = ['java', '-jar', '../bin/picard.jar', 'MergeSamFiles', 'OUTPUT=' + samf.name]
-    options_sort = ['java', '-jar', '../bin/picard.jar', 'SortSam', 'SORT_ORDER=coordinate']
+    options = ['java', '-jar', '../bin/picard.jar', 'MergeSamFiles', 'OUTPUT=' + samf.name, 'VALIDATION_STRINGENCY=LENIENT']
+    options_sort = ['java', '-jar', '../bin/picard.jar', 'SortSam', 'SORT_ORDER=coordinate', 'VALIDATION_STRINGENCY=LENIENT']
 
     for sf in samfiles:
+        subprogress(n+1, 'Sorting sam file %%')
         call(options_sort + ['INPUT=' + sf, 'OUTPUT=' + sf])
         options.append('INPUT=' + sf)
 
+    subprogress(n+1, 'Merging all sam files')
+
     call(options)
 
-    for sf in samfiles:
-        os.unlink(sf)
+    done('Merging sam files')
 
+    for sf in samfiles:
+        pass#os.unlink(sf)
+
+    progress('Adding reads to output file')
     tar.add(samf.name, arcname='sim_' + filename + '.sam')
+
+    done('Adding reads to output file')
 
     os.unlink(samf.name)
     tar.close()
+
+    all_done()
 
 if __name__ == '__main__':
     main(sys.argv[1:])
