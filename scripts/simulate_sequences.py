@@ -19,7 +19,7 @@ class Sequence:
 
         self.base_freqs = dict()
         for b in self.bases:
-            self.base_freqs[b] = 0
+            self.base_freqs[b] = 0.25
 
     def replicate(self):
         new_seq = Sequence(self.identifier, self.description)
@@ -41,9 +41,9 @@ class Sequence:
 
         for c in seq:
             new_freq[c] += 1
-
+            
         for (base, freq) in new_freq.items():
-            self.base_freqs[base] = (old_len * self.base_freqs[base] + new_len * freq) / length
+            self.base_freqs[base] = (old_len * self.base_freqs[base] + freq) / length
 
     def sample_base(self):
         r = random.random()
@@ -54,12 +54,12 @@ class Sequence:
             if r < ct:
                 return base
 
-    def create_snp(self, pos=-1, base='N'):
+    def create_snp(self, dist_fn=lambda self: self.sample_base(), pos=-1, base='N'):
         if pos < 0 or pos > len(self.sequence):
             pos = random.randint(0, len(self.sequence)-1)
 
         if base == 'N':
-            base = self.sample_base()
+            base = dist_fn(self)
 
         self.sequence[pos] = base
 
@@ -101,6 +101,14 @@ class ParsingError(Exception):
 
     def __str__(self):
         return repr(self.message)
+
+class ExternalError(Exception):
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        return repr(self.message)
+
 
 def readFASTA(filename):
     with open(filename, 'r') as f:
@@ -187,8 +195,8 @@ def main(argv):
 
     ref_genome = readFASTA(args.input)
 
-    m = re.match('(?P<name>.*)(\.fasta$)', args.input)
-    filename = m.group('name')
+    base = os.path.basename(args.input)
+    filename = os.path.splitext(base)[0]
 
     done('Reading input sequence')
 
@@ -263,11 +271,12 @@ def main(argv):
         f.close()
         f2.close()
 
-        call(['java', '-jar', '-Xmx2048m', '../bin/SimSeq.jar',
+        if call(['java', '-jar', '-Xmx2048m', '../bin/SimSeq.jar',
                 '--out', f2.name,
                 '--reference', hf,
                 '--read_number', str(int(args.coverage * len(ref_genome.sequence))),
-                '--error', '../data/miseq_250bp.txt'])
+                '--error', '../data/miseq_250bp.txt']):
+            raise ExternalError('SimSeq failed for ' + hf)
     
         with open('dict.sam') as d, open(f2.name) as old_sam, open(f.name, 'w') as new_sam:
             for line in d:
@@ -297,12 +306,14 @@ def main(argv):
 
     for sf in samfiles:
         subprogress(n+1, 'Sorting sam file %%')
-        call(options_sort + ['INPUT=' + sf, 'OUTPUT=' + sf])
+        if call(options_sort + ['INPUT=' + sf, 'OUTPUT=' + sf]):
+            raise ExternalError('Picard failed at sorting ' + sf)
         options.append('INPUT=' + sf)
 
     subprogress(n+1, 'Merging all sam files')
 
-    call(options)
+    if call(options):
+        raise ExternalError('Picard failed at merging all sam files')
 
     done('Merging sam files')
 
