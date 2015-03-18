@@ -9,6 +9,8 @@ import tempfile
 import sys
 import os
 
+from progressdone import *
+
 class Sequence:
 
     def __init__(self, identifier, description, bases=['A', 'G', 'C', 'T']):
@@ -125,53 +127,7 @@ def readFASTA(filename):
 
     return seq
 
-prog_ct = 0
-sub_ct = 0
 
-def progress(msg, done=True):
-    global prog_ct
-
-    print('[' + str(prog_ct) + ']', msg + '...')
-    if not done:
-            prog_ct += 1
-
-def subprogress_init_counter():
-    global sub_ct
-    sub_ct = 0
-
-def subprogress(num, msg='', counter=True):
-    global prog_ct, sub_ct
-
-    s = ''
-    new_msg =''
-
-    if counter:
-        s = str(sub_ct / num * 100) + '%'
-
-        m = re.split('%%', msg)
-
-        for substr in m[:-1]:
-            new_msg += substr
-            new_msg += str(sub_ct)
-
-        new_msg += m[-1]
-    else:
-        s = str(num)
-
-    print('[' + str(prog_ct) + '][' + s + ']', new_msg)
-
-    sub_ct += 1
-
-def done(msg=''):
-    global prog_ct
-
-    print('[' + str(prog_ct) + ']', 'Done.')
-    prog_ct += 1
-
-def all_done():
-    global prog_ct
-
-    print('[' + str(prog_ct) + ']', 'Finished all.')
 
 def main(argv):
     parser = argparse.ArgumentParser(description='Generate haplotypes from a reference genome and create simulated illumina reads with SimSeq')
@@ -206,7 +162,7 @@ def main(argv):
         args.output = filename + '_sht.tar.gz'
 
     tar = tarfile.open(args.output, 'w:gz')
-    tar.add(args.input, arcname='ref_' + args.input)
+    tar.add(args.input, arcname='ref_' + base)
 
     done('Creating output file')
 
@@ -285,7 +241,7 @@ def main(argv):
             for line in old_sam:
                 new_sam.write(line)
 
-        #os.unlink(f2.name)
+        os.unlink(f2.name)
 
     os.unlink('dict.sam')
 
@@ -305,12 +261,12 @@ def main(argv):
     options_sort = ['java', '-jar', '../bin/picard.jar', 'SortSam', 'SORT_ORDER=coordinate', 'VALIDATION_STRINGENCY=LENIENT']
 
     for sf in samfiles:
-        subprogress(n+1, 'Sorting sam file %%')
-        if call(options_sort + ['INPUT=' + sf, 'OUTPUT=' + sf]):
-            raise ExternalError('Picard failed at sorting ' + sf)
+        #subprogress(n+1, 'Sorting sam file %%')
+        #if call(options_sort + ['INPUT=' + sf, 'OUTPUT=' + sf]):
+        #    raise ExternalError('Picard failed at sorting ' + sf)
         options.append('INPUT=' + sf)
 
-    subprogress(n+1, 'Merging all sam files')
+    #subprogress(n+1, 'Merging all sam files')
 
     if call(options):
         raise ExternalError('Picard failed at merging all sam files')
@@ -318,14 +274,25 @@ def main(argv):
     done('Merging sam files')
 
     for sf in samfiles:
-        pass#os.unlink(sf)
+        os.unlink(sf)
 
-    progress('Adding reads to output file')
-    tar.add(samf.name, arcname='sim_' + filename + '.sam')
+    progress('Converting reads to bam format')
+
+    bamf = tempfile.NamedTemporaryFile(prefix='res_', suffix='.bam', delete=False)
+    bamf.close()
+
+    options = ['java', '-jar', '../bin/picard.jar', 'SamFormatConverter', 'INPUT=' + samf.name, 'OUTPUT=' + bamf.name]
+
+    if call(options):
+        raise ExternalError('Picard failed to convert ' + samf.name + ' to bam')
+
+    progress('Adding read alignment file to output file')
+    tar.add(bamf.name, arcname='sim_' + filename + '.bam')
 
     done('Adding reads to output file')
 
     os.unlink(samf.name)
+    os.unlink(bamf.name)
     tar.close()
 
     all_done()
