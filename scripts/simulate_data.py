@@ -213,37 +213,38 @@ def main(argv):
     progress('Simulating sequence reads')
     subprogress_init_counter()
 
-    subprogress(n+1, 'Creating sequence dictionary')
+    #subprogress(n+1, 'Creating sequence dictionary')
 
-    call(['java', '-jar', '../bin/picard.jar', 'CreateSequenceDictionary', 'REFERENCE=' + args.input, 'OUTPUT=dict.sam'])
+    #call(['java', '-jar', '../bin/picard.jar', 'CreateSequenceDictionary', 'REFERENCE=' + args.input, 'OUTPUT=dict.sam'])
 
     for hf in haplofiles:
 
         subprogress(n+1, 'Simulating reads for haplotype %%')
 
-        f = tempfile.NamedTemporaryFile(prefix='sort_', suffix='.sam', delete=False)
-        f2 = tempfile.NamedTemporaryFile(prefix='raw_', suffix='.sam', delete=False)
-        samfiles.append(f.name)
-        f.close()
-        f2.close()
+        read1 = tempfile.NamedTemporaryFile(prefix='per1_', suffix='.fastq', delete=False)
+        read2 = tempfile.NamedTemporaryFile(prefix='per2_', suffix='.fastq', delete=False)
+        raw_sam = tempfile.NamedTemporaryFile(prefix='sim_', suffix='.sam', delete=False)
+        end_sam = tempfile.NamedTemporaryFile(prefix='aligned_', suffix='.sam', delete=False)
+
+        samfiles.append(end_sam.name)
+        raw_sam.close()
+        end_sam.close()
+        read1.close()
+        read2.close()
 
         if call(['java', '-jar', '-Xmx2048m', '../bin/SimSeq.jar',
-                '--out', f2.name,
+                '--out', raw_sam.name,
                 '--reference', hf,
                 '--read_number', str(int(args.coverage * len(ref_genome.sequence))),
                 '--error', '../data/miseq_250bp.txt']):
             raise ExternalError('SimSeq failed for ' + hf)
     
-        with open('dict.sam') as d, open(f2.name) as old_sam, open(f.name, 'w') as new_sam:
-            for line in d:
-                new_sam.write(line)
+        if call(['java', '-jar', '../bin/picard.jar', 'SamToFastq', 'INPUT=' + raw_sam.name, 'FASTQ=' + read1.name, 'SECOND_END_FASTQ=' + read2.name]):
+            raise ExternalError('Picard failed to convert ' + raw_sam.name + ' to fastq')
 
-            for line in old_sam:
-                new_sam.write(line)
-
-        os.unlink(f2.name)
-
-    os.unlink('dict.sam')
+        os.unlink(raw_sam.name)
+        os.unlink(read1.name)
+        os.unlink(read2.name)
 
     for hf in haplofiles:
         if hf != args.input:
@@ -287,7 +288,7 @@ def main(argv):
         raise ExternalError('Picard failed to convert ' + samf.name + ' to bam')
 
     progress('Adding read alignment file to output file')
-    tar.add(bamf.name, arcname='sim_' + filename + '.bam')
+    tar.add(bamf.name, arcname='reads_' + filename + '.bam')
 
     done('Adding reads to output file')
 
