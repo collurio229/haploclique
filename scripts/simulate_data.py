@@ -142,10 +142,16 @@ def main(argv):
     parser.add_argument('--seed', type=int, help='seed for the Random Number Generator')
     parser.add_argument('-c', '--coverage', type=float, default=30.0, help='Average coverage for simulated reads. Default: 30')
     parser.add_argument('--no_ref', help='Don\'t add reference genome to data simulation.', default=True, action='store_false')
+    parser.add_argument('--validate', help='Validate the created sam file before converting to bam', default=False, action='store_true')
+
     args = parser.parse_args(argv)
 
     if args.seed:
         random.seed(args.seed)
+
+    if (args.snp and args.insert) or (args.snp and args.delete) or (args.insert and args.delete):
+        parser.print_help()
+        raise ParsingError('Do only use one haplotype generation method')
 
     progress('Reading input sequence')
 
@@ -165,6 +171,35 @@ def main(argv):
     tar.add(args.input, arcname='ref_' + base)
 
     done('Creating output file')
+
+    progress('Writing logfile')
+
+    with tempfile.NamedTemporaryFile(prefix= 'log_', suffix='.log', delete=False) as logfile:
+        log = logfile.name        
+
+        if args.snp:
+            logfile.write(bytes('method: snp\n', 'UTF-8'))
+        elif args.insert:
+            logfile.write(bytes('method: insert\n', 'UTF-8'))
+        elif args.delete:
+            logfile.write(bytes('method: delete\n'))
+
+        logfile.write(bytes('mean: ' + str(args.mean) + '\n', 'UTF-8'))
+        logfile.write(bytes('sigma: ' + str(args.sigma) + '\n', 'UTF-8'))
+        logfile.write(bytes('number: ' + str(args.number) + '\n', 'UTF-8'))
+        logfile.write(bytes('seed: ' + str(args.seed) + '\n', 'UTF-8'))
+        logfile.write(bytes('coverage: ' + str(args.seed) + '\n', 'UTF-8'))
+        
+        if args.no_ref:
+            logfile.write(bytes('no_ref\n', 'UTF-8'))
+
+        if args.validate:
+            logfile.write(bytes('validate\n', 'UTF-8'))
+
+    tar.add(log, arcname= 'args_' + filename + '.log')
+
+    os.unlink(log)
+    done('Writing logfile')
 
     progress('Creating new haplotypes')
     subprogress_init_counter()
@@ -213,13 +248,14 @@ def main(argv):
     progress('Simulating sequence reads')
     subprogress_init_counter()
 
-    #subprogress(n+1, 'Creating sequence dictionary')
+    subprogress(n+1, 'Creating bwa index')
 
-    #call(['java', '-jar', '../bin/picard.jar', 'CreateSequenceDictionary', 'REFERENCE=' + args.input, 'OUTPUT=dict.sam'])
+    if call(['bwa', 'index', '-p', 'tmp_index', args.input]):
+        raise ExternalError('Failed to create an index for alignment')
 
     for hf in haplofiles:
 
-        subprogress(n+1, 'Simulating reads for haplotype %%')
+        subprogress(4*n+1, 'Simulating reads for haplotype %%')
 
         read1 = tempfile.NamedTemporaryFile(prefix='per1_', suffix='.fastq', delete=False)
         read2 = tempfile.NamedTemporaryFile(prefix='per2_', suffix='.fastq', delete=False)
@@ -228,7 +264,6 @@ def main(argv):
 
         samfiles.append(end_sam.name)
         raw_sam.close()
-        end_sam.close()
         read1.close()
         read2.close()
 
@@ -239,16 +274,41 @@ def main(argv):
                 '--error', '../data/miseq_250bp.txt']):
             raise ExternalError('SimSeq failed for ' + hf)
     
-        if call(['java', '-jar', '../bin/picard.jar', 'SamToFastq', 'INPUT=' + raw_sam.name, 'FASTQ=' + read1.name, 'SECOND_END_FASTQ=' + read2.name]):
+        subprogress(4*n+1, 'Creating sequence dictionary for haplotype %%')
+
+        if call(['java', '-jar', '-Xmx2g', '../bin/picard.jar', 'CreateSequenceDictionary', 'REFERENCE=' + hf, 'OUTPUT=/tmp/dict.sam', 'VERBOSITY=ERROR']):
+            raise ExternalError('Picard failed to create a sequence dictionary for ' + hf)
+
+        with open('/tmp/dict.sam', 'a') as header, open(raw_sam.name, 'r') as sam_input:
+            for line in sam_input:
+                header.write(line)
+
+        subprogress(4*n+1, 'Converting reads of haplotype %% to fastq format')
+
+        if call(['java', '-jar', '-Xmx2g', '../bin/picard.jar', 'SamToFastq', 'INPUT=/tmp/dict.sam', 'FASTQ=' + read1.name, 'SECOND_END_FASTQ=' + read2.name, 'VALIDATION_STRINGENCY=LENIENT', 'VERBOSITY=ERROR']):
             raise ExternalError('Picard failed to convert ' + raw_sam.name + ' to fastq')
+
+        subprogress(4*n+1, 'Aligning reads of haplotype %% to reference genome')
+
+        if call(['bwa', 'mem', 'tmp_index', read1.name, read2.name], stdout=end_sam):
+            raise ExternalError('bwa failed to align ' + read1.name + ', ' + read2.name)
+
+        end_sam.close()
 
         os.unlink(raw_sam.name)
         os.unlink(read1.name)
         os.unlink(read2.name)
+        os.unlink('/tmp/dict.sam')
 
     for hf in haplofiles:
         if hf != args.input:
             os.unlink(hf)
+
+    os.unlink('tmp_index.amb')
+    os.unlink('tmp_index.ann')
+    os.unlink('tmp_index.bwt')
+    os.unlink('tmp_index.pac')
+    os.unlink('tmp_index.sa')
 
     done('Simulating sequence reads')
 
@@ -258,16 +318,10 @@ def main(argv):
     samf = tempfile.NamedTemporaryFile(prefix='merge_', suffix='.sam', delete=False)
     samf.close()
 
-    options = ['java', '-jar', '../bin/picard.jar', 'MergeSamFiles', 'OUTPUT=' + samf.name, 'VALIDATION_STRINGENCY=LENIENT']
-    options_sort = ['java', '-jar', '../bin/picard.jar', 'SortSam', 'SORT_ORDER=coordinate', 'VALIDATION_STRINGENCY=LENIENT']
+    options = ['java', '-jar', '-Xmx2g', '../bin/picard.jar', 'MergeSamFiles', 'OUTPUT=' + samf.name, 'VERBOSITY=ERROR']
 
     for sf in samfiles:
-        #subprogress(n+1, 'Sorting sam file %%')
-        #if call(options_sort + ['INPUT=' + sf, 'OUTPUT=' + sf]):
-        #    raise ExternalError('Picard failed at sorting ' + sf)
         options.append('INPUT=' + sf)
-
-    #subprogress(n+1, 'Merging all sam files')
 
     if call(options):
         raise ExternalError('Picard failed at merging all sam files')
@@ -277,12 +331,20 @@ def main(argv):
     for sf in samfiles:
         os.unlink(sf)
 
+    if args.validate:
+        progress('Validating merged sam file')
+
+        if call(['java', '-jar', '-Xmx2g', '../bin/picard.jar','ValidateSamFile', 'INPUT=' + samf.name]):
+            raise ExternalError('Validation of merged sam file failed')
+
+        done('Validating merged sam file')
+
     progress('Converting reads to bam format')
 
     bamf = tempfile.NamedTemporaryFile(prefix='res_', suffix='.bam', delete=False)
     bamf.close()
 
-    options = ['java', '-jar', '../bin/picard.jar', 'SamFormatConverter', 'INPUT=' + samf.name, 'OUTPUT=' + bamf.name]
+    options = ['java', '-jar', '-Xmx2g', '../bin/picard.jar', 'SamFormatConverter', 'INPUT=' + samf.name, 'OUTPUT=' + bamf.name, 'VERBOSITY=ERROR']
 
     if call(options):
         raise ExternalError('Picard failed to convert ' + samf.name + ' to bam')

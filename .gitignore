@@ -2,3 +2,5 @@ build/*
 bwa/*
 samtools/*
 htslib/*
+*~
+*.pyc
