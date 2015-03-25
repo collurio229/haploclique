@@ -97,7 +97,8 @@ class Sequence:
 
         for j in range(1, n):
             for i in range(1, m):
-                if self.sequence[i-2] == compare.sequence[j-2]:
+
+                if self.sequence[j-1] == compare.sequence[i-1]:
                     matrix[i][j] = matrix[i-1][j-1]
                 else:
                     left = matrix[i][j-1] + 1
@@ -105,12 +106,6 @@ class Sequence:
                     middle = matrix[i-1][j-1] + 1
 
                     matrix[i][j] = min(left, right, middle)
-
-        for line in matrix:
-            print(line)
-
-        print(''.join(self.sequence))
-        print(''.join(compare.sequence))
 
         return matrix[m-1][n-1]
 
@@ -151,13 +146,10 @@ def readFASTA(filename):
         for line in f:            
 
             if line[0] == '>':
-                print('matched:', line)
                 seq_results.append(seq)
                 seq = Sequence(line.rstrip()[1:])
             else:
-
                 seq.add_sequence(line.rstrip())
-                print('added:', line.rstrip())
 
         if seq.sequence != '':
             seq_results.append(seq)
