@@ -1,3 +1,5 @@
+from math import sqrt
+
 class Sequence:
 
     def __init__(self, identifier, description, bases=['A', 'G', 'C', 'T']):
@@ -125,9 +127,9 @@ def compute_best_match_score(forward_set, backward_set):
             if res < result:
                 result = res
 
-        score += result
+        score += result*result
 
-    return score
+    return sqrt(score)
 
 def readFASTA(filename):
     with open(filename, 'r') as f:
