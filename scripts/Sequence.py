@@ -84,12 +84,50 @@ class Sequence:
                 ct = 0
                 fileobj.write(b'\n')
 
+    def edit_dist(self, compare):
+        n = len(self.sequence) + 1
+        m = len(compare.sequence) + 1
+        
+        matrix = [list(range(0, n))]
+        
+        for i in range(1, m):
+            matrix.append(list(range(i, n+i)))
+
+        for j in range(1, n):
+            for i in range(1, m):
+                if self.sequence[i-2] == compare.sequence[j-2]:
+                    matrix[i][j] = matrix[i-1][j-1]
+                else:
+                    left = matrix[i][j-1] + 1
+                    right = matrix[i-1][j] + 1
+                    middle = matrix[i-1][j-1] + 1
+
+                    matrix[i][j] = min(left, right, middle)
+
+        return matrix[m-1][n-1]
+
 class ParsingError(Exception):
     def __init__(self, message):
         self.message = message
 
     def __str__(self):
         return repr(self.message)
+
+def compute_best_match_score(forward_set, backward_set):
+    
+    score = 0
+
+    for seq in forward_set:
+        result = seq.edit_dist(forward_set[0])
+
+        for comp in backward_set[1:]:
+            res = seq.edit_dist(comp)
+            if res < result:
+                result = res
+
+        score += result
+
+    return score
 
 def readFASTA(filename):
     with open(filename, 'r') as f:
@@ -99,9 +137,17 @@ def readFASTA(filename):
         if not m:
             raise ParsingError('FASTA header was not valid')
 
+        seq_results = []
         seq = Sequence(m.group('identifier'), m.group('description'))
 
         for line in f:
+            m = re.search('>(?P<identifier>\w*)\|(?P<description>.*)', header)
+
+            if m:
+                seq_results.append(seq)
+                seq = Sequence(m.group('identifier'), m.group('description'))
+                continue
+
             seq.add_sequence(line.rstrip())
 
-    return seq
+    return seq_results
