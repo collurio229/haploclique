@@ -1,10 +1,10 @@
+import re
 from math import sqrt
 
 class Sequence:
 
-    def __init__(self, identifier, description, bases=['A', 'G', 'C', 'T']):
+    def __init__(self, identifier, bases=['A', 'G', 'C', 'T']):
         self.identifier = identifier
-        self.description = description
         self.sequence = []
         self.bases = bases
 
@@ -13,7 +13,7 @@ class Sequence:
             self.base_freqs[b] = 0.25
 
     def replicate(self):
-        new_seq = Sequence(self.identifier, self.description)
+        new_seq = Sequence(self.identifier)
         new_seq.add_sequence(''.join(self.sequence))
 
         return new_seq
@@ -77,7 +77,7 @@ class Sequence:
         self.sequence[pos:pos+length] = []
 
     def writeFASTA(self, fileobj):
-        fileobj.write(bytes('>' + self.identifier + '|' + self.description + '\n', 'UTF-8'))
+        fileobj.write(bytes('>' + self.identifier + '\n', 'UTF-8'))
         ct = 0
         for base in self.sequence:
             fileobj.write(bytes(base, 'UTF-8'))
@@ -106,6 +106,12 @@ class Sequence:
 
                     matrix[i][j] = min(left, right, middle)
 
+        for line in matrix:
+            print(line)
+
+        print(''.join(self.sequence))
+        print(''.join(compare.sequence))
+
         return matrix[m-1][n-1]
 
 class ParsingError(Exception):
@@ -126,7 +132,7 @@ def compute_best_match_score(forward_set, backward_set):
             res = seq.edit_dist(comp)
             if res < result:
                 result = res
-
+        
         score += result*result
 
     return sqrt(score)
@@ -135,21 +141,25 @@ def readFASTA(filename):
     with open(filename, 'r') as f:
         header = f.readline()
 
-        m = re.search('>(?P<identifier>\w*)\|(?P<description>.*)', header)
+        m = re.match(r'>(?P<identifier>\w*)', header)
         if not m:
             raise ParsingError('FASTA header was not valid')
 
         seq_results = []
-        seq = Sequence(m.group('identifier'), m.group('description'))
+        seq = Sequence(m.group('identifier'))
 
-        for line in f:
-            m = re.search('>(?P<identifier>\w*)\|(?P<description>.*)', header)
+        for line in f:            
 
-            if m:
+            if line[0] == '>':
+                print('matched:', line)
                 seq_results.append(seq)
-                seq = Sequence(m.group('identifier'), m.group('description'))
-                continue
+                seq = Sequence(line.rstrip()[1:])
+            else:
 
-            seq.add_sequence(line.rstrip())
+                seq.add_sequence(line.rstrip())
+                print('added:', line.rstrip())
+
+        if seq.sequence != '':
+            seq_results.append(seq)
 
     return seq_results

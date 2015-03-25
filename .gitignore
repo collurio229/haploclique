@@ -4,3 +4,4 @@ samtools/*
 htslib/*
 *~
 *.pyc
+.*

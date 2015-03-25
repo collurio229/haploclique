@@ -46,7 +46,7 @@ def main(argv):
 
     progress('Reading input sequence')
 
-    ref_genome = readFASTA(args.input)
+    ref_genome = readFASTA(args.input)[0]
 
     base = os.path.basename(args.input)
     filename = os.path.splitext(base)[0]
@@ -79,7 +79,7 @@ def main(argv):
         logfile.write(bytes('sigma: ' + str(args.sigma) + '\n', 'UTF-8'))
         logfile.write(bytes('number: ' + str(args.number) + '\n', 'UTF-8'))
         logfile.write(bytes('seed: ' + str(args.seed) + '\n', 'UTF-8'))
-        logfile.write(bytes('coverage: ' + str(args.seed) + '\n', 'UTF-8'))
+        logfile.write(bytes('coverage: ' + str(args.coverage) + '\n', 'UTF-8'))
         
         if args.no_ref:
             logfile.write(bytes('no_ref\n', 'UTF-8'))
