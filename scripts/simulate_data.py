@@ -1,9 +1,41 @@
 #!/usr/bin/env python3
+"""
+This script generates simulated haplotype data and Illumina reads from a
+reference DNA sequence.
+
+Usage: 
+  simulate_data.py (--snp | --ins | --del ) [options] [--] <input> [<output>]
+  simulate_data.py -h | --help
+
+  --snp     Generate new haplotypes through substituting random nucleotides
+  --ins     Generate new haplotypes through inserting random sequences
+  --del     Generate new haplotypes through deletion of a random sequence part
+
+  <input>   The reference sequence in FASTA format
+  <output>  The destination of the packed data as tar.gz archive.
+            The archive will include a bam file with simulated Illumina reads,
+            the reference and all haplotype sequences in FASTA format and
+            a log file with all used options.
+
+Options:
+  -h --help                     Show this message
+  -m <num>, --mean <num>        mean value for length of indels or number of 
+                                nucleotide substitutions [default: 1.0]
+  -s <num>, --sigma <num>       standard deviation for length of indels or
+                                number of nucleotide substitions [default: 0.0]
+  -n <num>, --number <num>      number of created haplotypes [default: 1]
+  -c <num>, --coverage <num>    average coverage for simulated reads
+                                [default: 30]
+  --seed <num>                  seed for random number generator
+  --no_ref                      don't include reference sequence in
+                                read simulation
+  --validate                    validate created sam file with picard
+"""
 
 from subprocess import call
+from docopt import docopt
 import random
 import re
-import argparse
 import tarfile
 import tempfile
 import sys
@@ -14,6 +46,12 @@ from Sequence import *
 
 
 class ExternalError(Exception):
+    """Raise this error if an external process fails.
+
+    This class is a standard implementation of an error class 
+    and should be used if a program called with subprocess fails,
+    e.g. return value is not 0"""
+
     def __init__(self, message):
         self.message = message
 
@@ -21,45 +59,37 @@ class ExternalError(Exception):
         return repr(self.message)
 
 def main(argv):
-    parser = argparse.ArgumentParser(description='Generate haplotypes from a reference genome and create simulated illumina reads with SimSeq')
-    parser.add_argument('-i', '--input', help='the reference genome in FASTA format (REQUIRED)', required=True, metavar='reference.fasta')
-    parser.add_argument('-o', '--output', help='destination of the generated data tar.gz archive. It contains the reference sequence, the generated haplotypes and the simulated sam file.', metavar='output.tar.gz')
-    parser.add_argument('--snp', help='generate new haplotypes through substituting random nucleotides.', default=False, action='store_true')
-    parser.add_argument('--insert', help='generate new haplotypes through inserting random sequences.', default=False, action='store_true')
-    parser.add_argument('--delete', help='generate new haplotypes through deleting random sequences.', default=False, action='store_true')
-    parser.add_argument('-m', '--mean', type=int, default=1, help='mean value for length of indels or number of nucleotide substitutions. Default: 1')
-    parser.add_argument('-s', '--sigma', type=int, default=0, help='standard deviation for length of indels or number of nucleotide substitions. Default: 0')
-    parser.add_argument('-n', '--number', type=int, default=1, help='number of created haplotypes. Default: 1')
-    parser.add_argument('--seed', type=int, help='seed for the Random Number Generator')
-    parser.add_argument('-c', '--coverage', type=float, default=30.0, help='Average coverage for simulated reads. Default: 30')
-    parser.add_argument('--no_ref', help='Don\'t add reference genome to data simulation.', default=True, action='store_false')
-    parser.add_argument('--validate', help='Validate the created sam file before converting to bam', default=False, action='store_true')
+    """This script generates simulated haplotype data and Illumina reads from a reference genome.
+    
+    Use ['-h'] or ['--help--'] as arguments to display a usage message"""
 
-    args = parser.parse_args(argv)
+    args = docopt(__doc__, argv=argv)
 
-    if args.seed:
-        random.seed(args.seed)
+    if args['--seed']:
+        random.seed(args['--seed'])
 
-    if (args.snp and args.insert) or (args.snp and args.delete) or (args.insert and args.delete):
-        parser.print_help()
-        raise ParsingError('Do only use one haplotype generation method')
+    # convert parsed arguments from string to int or float
+    args['--mean'] = float(args['--mean'])
+    args['--sigma'] = float(args['--sigma'])
+    args['--number'] = int(args['--number'])
+    args['--coverage'] = int(args['--coverage'])
 
     progress('Reading input sequence')
 
-    ref_genome = readFASTA(args.input)[0]
+    ref_genome = readFASTA(args['<input>'])[0]
 
-    base = os.path.basename(args.input)
+    base = os.path.basename(args['<input>'])
     filename = os.path.splitext(base)[0]
 
     done('Reading input sequence')
 
     progress('Creating output file')
 
-    if not args.output:
-        args.output = filename + '_sht.tar.gz'
+    if not args['<output>']:
+        args['<output>'] = 'sht_' + filename + '.tar.gz'
 
-    tar = tarfile.open(args.output, 'w:gz')
-    tar.add(args.input, arcname='ref_' + base)
+    tar = tarfile.open(args['<output>'], 'w:gz')
+    tar.add(args['<input>'], arcname='ref_' + base)
 
     done('Creating output file')
 
@@ -68,23 +98,23 @@ def main(argv):
     with tempfile.NamedTemporaryFile(prefix= 'log_', suffix='.log', delete=False) as logfile:
         log = logfile.name        
 
-        if args.snp:
+        if args['--snp']:
             logfile.write(bytes('method: snp\n', 'UTF-8'))
-        elif args.insert:
+        elif args['--ins']:
             logfile.write(bytes('method: insert\n', 'UTF-8'))
-        elif args.delete:
+        elif args['--del']:
             logfile.write(bytes('method: delete\n'))
 
-        logfile.write(bytes('mean: ' + str(args.mean) + '\n', 'UTF-8'))
-        logfile.write(bytes('sigma: ' + str(args.sigma) + '\n', 'UTF-8'))
-        logfile.write(bytes('number: ' + str(args.number) + '\n', 'UTF-8'))
-        logfile.write(bytes('seed: ' + str(args.seed) + '\n', 'UTF-8'))
-        logfile.write(bytes('coverage: ' + str(args.coverage) + '\n', 'UTF-8'))
+        logfile.write(bytes('mean: ' + str(args['--mean']) + '\n', 'UTF-8'))
+        logfile.write(bytes('sigma: ' + str(args['--sigma']) + '\n', 'UTF-8'))
+        logfile.write(bytes('number: ' + str(args['--number']) + '\n', 'UTF-8'))
+        logfile.write(bytes('seed: ' + str(args['--seed']) + '\n', 'UTF-8'))
+        logfile.write(bytes('coverage: ' + str(args['--coverage']) + '\n', 'UTF-8'))
         
-        if args.no_ref:
+        if args['--no_ref']:
             logfile.write(bytes('no_ref\n', 'UTF-8'))
 
-        if args.validate:
+        if args['--validate']:
             logfile.write(bytes('validate\n', 'UTF-8'))
 
     tar.add(log, arcname= 'args_' + filename + '.log')
@@ -95,12 +125,12 @@ def main(argv):
     progress('Creating new haplotypes')
     subprogress_init_counter()
 
-    n = args.number
+    n = args['--number']
 
     haplofiles = []
 
-    if not args.no_ref:
-        haplofiles.append(args.input)
+    if not args['--no_ref']:
+        haplofiles.append(args['<input>'])
 
     for i in range(0, n):
 
@@ -108,21 +138,21 @@ def main(argv):
 
         seq = ref_genome.replicate()
 
-        mean = args.mean
-        sigma = args.sigma
+        mean = args['--mean']
+        sigma = args['--sigma']
 
         if mean < 1:
             mean *= len(ref_genome.sequence)
             sigma *= len(ref_genome.sigma)
 
-        if args.snp:
+        if args['--snp']:
             for j in range(0, int(random.gauss(mean, sigma))):
                 seq.create_snp()
 
-        if args.insert:
+        elif args['--ins']:
             seq.create_insertion(mean, sigma)
 
-        if args.delete:
+        elif args['--del']:
             seq.create_deletion(mean, sigma)
 
         f = tempfile.NamedTemporaryFile(suffix='.fasta', delete=False)
@@ -141,7 +171,7 @@ def main(argv):
 
     subprogress(n+1, 'Creating bwa index')
 
-    if call(['bwa', 'index', '-p', 'tmp_index', args.input]):
+    if call(['bwa', 'index', '-p', 'tmp_index', args['<input>']]):
         raise ExternalError('Failed to create an index for alignment')
 
     for hf in haplofiles:
@@ -161,7 +191,7 @@ def main(argv):
         if call(['java', '-jar', '-Xmx2048m', '../bin/SimSeq.jar',
                 '--out', raw_sam.name,
                 '--reference', hf,
-                '--read_number', str(int(args.coverage * len(ref_genome.sequence))),
+                '--read_number', str(int(args['--coverage'] * len(ref_genome.sequence))),
                 '--error', '../data/miseq_250bp.txt']):
             raise ExternalError('SimSeq failed for ' + hf)
     
@@ -192,7 +222,7 @@ def main(argv):
         os.unlink('/tmp/dict.sam')
 
     for hf in haplofiles:
-        if hf != args.input:
+        if hf != args['<input>']:
             os.unlink(hf)
 
     os.unlink('tmp_index.amb')
@@ -222,7 +252,7 @@ def main(argv):
     for sf in samfiles:
         os.unlink(sf)
 
-    if args.validate:
+    if args['--validate']:
         progress('Validating merged sam file')
 
         if call(['java', '-jar', '-Xmx2g', '../bin/picard.jar','ValidateSamFile', 'INPUT=' + samf.name]):
