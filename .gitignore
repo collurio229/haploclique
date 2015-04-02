@@ -5,3 +5,4 @@ htslib/*
 *~
 *.pyc
 .*
+*.tar.gz
