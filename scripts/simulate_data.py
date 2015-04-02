@@ -35,7 +35,6 @@ Options:
 from subprocess import call
 from docopt import docopt
 import random
-import re
 import tarfile
 import tempfile
 import sys
@@ -61,7 +60,8 @@ class ExternalError(Exception):
 def main(argv):
     """This script generates simulated haplotype data and Illumina reads from a reference genome.
     
-    Use ['-h'] or ['--help--'] as arguments to display a usage message"""
+    Use ['-h'] or ['--help--'] as arguments to display a usage message
+    or look into the module __doc__"""
 
     args = docopt(__doc__, argv=argv)
 
