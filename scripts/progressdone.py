@@ -21,7 +21,7 @@ def subprogress(num, msg='', counter=True):
     new_msg =''
 
     if counter:
-        s = str(sub_ct / num * 100) + '%'
+        s = str(round(sub_ct / num * 100, 2)) + '%'
 
         m = re.split('%%', msg)
 
