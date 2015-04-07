@@ -30,9 +30,10 @@ import os
 
 from progressdone import *
 from Sequence import *
+import haploclique
 
 class UnknownFileError(Exception):
-"""Raise this error if a file doesn't apply to naming conventions.
+    """Raise this error if a file doesn't apply to naming conventions.
 
     This class is a standard implementation of an error class 
     and should be used if a file in the given tar.gz archive doesn't
@@ -45,7 +46,7 @@ class UnknownFileError(Exception):
         return repr(self.message)
 
 class ExternalError(Exception):
-"""Raise this error if an external process fails.
+    """Raise this error if an external process fails.
 
     This class is a standard implementation of an error class 
     and should be used if a program called with subprocess fails,
@@ -58,7 +59,7 @@ class ExternalError(Exception):
         return repr(self.message)
 
 def parseLog(logfile):
-"""Parses a log file into a dictionary.
+    """Parses a log file into a dictionary.
 
     The log file can contain information about the method used to
     create artificial haplotypes, the numerical arguments used and
