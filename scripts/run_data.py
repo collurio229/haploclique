@@ -74,14 +74,6 @@ def parseLog(logfile):
 
     log = dict()
 
-    m = Match()
-
-    method = re.compile(r'method: (?P<method>\w+)')
-    for line in logfile:
-
-        if m.test(re.match(r'method: (?P<method>\w+)', line)):
-            log['method'] = re.match(r'method: (?P<method>\w+)', line).group('method')
-
     return log
 
 def main(argv):
@@ -126,8 +118,7 @@ def main(argv):
     if call(['samtools', 'index', path + '/' + reads]):
         raise ExternalError('Index creation failed')
 
-    if call(['./haploclique-assembly', '-r', path + '/' + ref, '-i', path + '/' + reads, '-t', str(args['--iterations')]):
-        raise ExternalError('Haploclique failed')
+    haploclique.main(['--iterations', str(args['--iterations']), path + '/' + ref, path + '/' + reads])
 
     quasispecies = readFASTA('./quasispecies.fasta')
     ref_sequences = []
