@@ -4,21 +4,21 @@ import random
 from math import sqrt
 
 class Sequence:
-"""Stores a sequence of characters like DNA.
+    """Stores a sequence of characters like DNA.
 
     The sequence is stored as a list of characters.
     The class also includes methods to alter the sequence.
     """
 
     def __init__(self, identifier, bases=['A', 'G', 'C', 'T']):
-    """Constructor of Sequence class."""
+        """Constructor of Sequence class."""
 
         self.identifier = identifier
         self.sequence = []
         self.bases = bases
 
-     def replicate(self):
-    """Returns a new copy of this sequence."""
+    def replicate(self):
+        """Returns a new copy of this sequence."""
 
         new_seq = Sequence(self.identifier)
         new_seq.add_sequence(''.join(self.sequence))
@@ -26,19 +26,19 @@ class Sequence:
         return new_seq
 
     def add_sequence(self, seq):
-    """Adds string seq to the sequence."""
+        """Adds string seq to the sequence."""
 
         self.sequence.extend(list(seq))
 
     def sample_base(self):
-    """Sample a random base from the sequence"""
+        """Sample a random base from the sequence"""
 
         r = random.randint(0, len(self.sequence)-1)
         
         return sequence[r]
 
     def create_snp(self, dist_fn=lambda self: self.sample_base(), pos=-1):
-    """Creates one single nucleotide polymorphism in the sequence.
+        """Creates one single nucleotide polymorphism in the sequence.
 
         The function takes a distribution function which must return one of the characters
         of the sequence and the position where to create the snp.
@@ -54,7 +54,7 @@ class Sequence:
         self.sequence[pos] = base
 
     def create_insertion(self, mean, std_dev, dist_fn=lambda self: self.sample_base(), pos=-1):
-    """Create an insertion of length mean with standard deviation std_dev.
+        """Create an insertion of length mean with standard deviation std_dev.
 
         The inserted bases are generated with the distribution function dist_fn and are
         inserted at position pos.
@@ -75,7 +75,7 @@ class Sequence:
         self.sequence[pos:pos] = insert
 
     def create_deletion(self, mean, std_dev, pos=-1):
-    """Create a deletion of length mean with standard deviation std_dev.
+        """Create a deletion of length mean with standard deviation std_dev.
 
         The position is pos, if pos is -1, then the position will be randomly
         sampled."""
@@ -88,7 +88,7 @@ class Sequence:
         self.sequence[pos:pos+length] = []
 
     def writeFASTA(self, fileobj):
-    """Write the sequence on disk in FASTA format."""
+        """Write the sequence on disk in FASTA format."""
 
         # Write header
         fileobj.write(bytes('>' + self.identifier + '\n', 'UTF-8'))
@@ -103,7 +103,7 @@ class Sequence:
                 fileobj.write(b'\n')
 
     def edit_dist(self, compare):
-    """Compute the edit distance between this and a given sequence."""
+        """Compute the edit distance between this and a given sequence."""
 
         n = len(self.sequence) + 1
         m = len(compare.sequence) + 1
@@ -128,7 +128,7 @@ class Sequence:
         return matrix[m-1][n-1]
 
 class ParsingError(Exception):
-"""Use this error class, if an error in parsing of a FASTA file occured"""
+    """Use this error class, if an error in parsing of a FASTA file occured"""
 
     def __init__(self, message):
         self.message = message
@@ -137,7 +137,7 @@ class ParsingError(Exception):
         return repr(self.message)
 
 def compute_best_match_score(forward_set, backward_set):
-"""Computes the mean root square error from the best edit distances between
+    """Computes the mean root square error from the best edit distances between
     the sequences in the forward set and the backward_set."""
 
     score = 0
@@ -155,7 +155,7 @@ def compute_best_match_score(forward_set, backward_set):
     return sqrt(score)
 
 def readFASTA(filename):
-"""Create all Sequences included in a FASTA file.
+    """Create all Sequences included in a FASTA file.
 
     Because a FASTA file can include more than one sequences, this
     function returns a list of sequences."""

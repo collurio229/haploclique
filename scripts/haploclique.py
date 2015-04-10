@@ -45,16 +45,18 @@ def haploclique(prior):
 
     ret_vals = (0, 0, 0)
 
-    with open(prior, 'r') as inf, tempfile.SpooledTemporaryFile() as outf:
+    with open(prior, 'r') as inf, tempfile.SpooledTemporaryFile(mode='w+') as outf:
         
-        check_call(['../bin/haploclique', '-L', '100'], stdin=inf, stdout=outf)
+        check_call(['../bin/haploclique', '-L', '100'], stdin=inf, stderr=outf)
+
+        outf.seek(0)
 
         for line in outf:
             m = re.search(r'(?P<cliques>\d+)\/(?P<uniques>\d+)\/(?P<cputime>\d+)', line)
 
             if m:
                 ret_vals = (int(m.group('cliques')), int(m.group('uniques')), int(m.group('cputime')))
-
+ 
     return ret_vals 
 
 def assemble(reference, read1, read2, read_single, prior):
@@ -135,7 +137,7 @@ def main(argv):
         cliques, uniques, cputime = haploclique(prior)
 
         if cliques == 0:
-            print('Converged after', i, 'runs')
+            print('Converged after', i+1, 'runs')
             break
 
         assemble(args['<reference>'], 'data_cliques_paired_R1.fastq', 'data_cliques_paired_R2.fastq', 'data_cliques_single.fastq', prior)
