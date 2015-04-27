@@ -69,11 +69,28 @@ def parseLog(logfile):
     """
     
     regexes = {'method': re.compile(r'method: (?P<method>\w+)'),
-               'numeric': re.compile(r'(?P<name>\w+) (?P<digit>\d+)'),
+               'numeric': re.compile(r'(?P<name>\w+): (?P<digit>\d+)'),
                'binary': re.compile(r'(?P<name>no_ref|validate)')}
 
-    log = dict()
+    log = {'snp': False, 'ins': False, 'del': False, 'no_ref': False, 'validate': False}
 
+    for line in logfile:
+
+        for key, regex in regexes:
+            m = regex.match(line)
+
+            if (m):
+                if key == 'method':
+                    log[m.group('method')] = True
+                    break
+                elif key == 'numeric':
+                    log[m.group('name')] = m.group('digit')
+                    break
+                else:
+                    log[m.group('name') = True
+                    break
+                    
+                    
     return log
 
 def main(argv):
@@ -103,11 +120,11 @@ def main(argv):
             archive.extract(member, path)
             haplofiles.append(member.name)
         elif re.match(r'args_(.*)\.log', member.name):
-            log = archive.extractfile(member)
+            logfile = archive.extractfile(member)
         else:
             raise UnknownFileError('Unrecognized file. Check prefix or file extensions of included files')
 
-    parseLog(log)
+    log = parseLog(logfile)
 
     # set the PATH variable to local haploclique binary
     if args['--path']:
