@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Run haploclique on paired-end reads in bam format.
+"""Run haploclique on paired-end reads in bam format.
 
 This is a simplified python version of the original haploclique-assembly shell script.
 Because of that, lacks some of the sophisticated options of the original script.
@@ -16,12 +15,13 @@ Options:
   -i <num>, --iterations <num>  number of haploclique iterations. [default: 1]
 """
 
-from subprocess import check_call, Popen, PIPE
+from subprocess import check_call, Popen, PIPE, CalledProcessError
 from docopt import docopt
 import tempfile
 import os
 import sys
 import re
+import shutil
 try:
     from subprocess import DEVNULL
 except ImportError:
@@ -32,10 +32,7 @@ def initialize(reference, alignment):
 
     outf = tempfile.NamedTemporaryFile(suffix='.prior', delete=False)
     
-    ps = Popen(['../bin/bam-to-alignment-priors', '--ignore_xa', reference, alignment], stdout=PIPE, stderr=DEVNULL)
-
-    check_call(['sort', '-k6,6', '-g'], stdin=ps.stdout, stdout=outf)
-    ps.wait()
+    check_call(['../bin/bam-to-alignment-priors', '--ignore_xa', reference, alignment], stdout=outf, stderr=DEVNULL)
 
     outf.close()
 
@@ -49,9 +46,18 @@ def haploclique(prior):
 
     ret_vals = (0, 0, 0)
 
+    sortprior(prior)
+
     with open(prior, 'r') as inf, tempfile.SpooledTemporaryFile(mode='w+') as outf:
         
-        check_call(['../bin/haploclique', '-L', '100'], stdin=inf, stderr=outf)
+        try:
+            check_call(['../bin/haploclique', '-L', '100'], stdin=inf, stderr=outf)
+        except CalledProcessError:
+            outf.seek(0)
+            for line in outf:
+                print(line)
+            
+            sys.exit(1)
 
         outf.seek(0)
 
@@ -96,10 +102,7 @@ def assemble(reference, read1, read2, read_single, prior):
                 os.unlink(samfile.name)
                 os.unlink(bamfile.name)
 
-                ps = Popen(['../bin/bam-to-alignment-priors', '--ignore_xa', reference, 'paired.bam'], stdout=PIPE, stderr=DEVNULL)
-
-                check_call(['sort', '-k6,6', '-g'], stdin=ps.stdout, stdout=priorfile)
-                ps.wait()
+                check_call(['../bin/bam-to-alignment-priors', '--ignore_xa', reference, 'paired.bam'], stdout=priorfile, stderr=DEVNULL)
 
         if (os.path.exists(read_single)):
             if (os.path.getsize(read_single) != 0):
@@ -117,15 +120,24 @@ def assemble(reference, read1, read2, read_single, prior):
                 os.unlink(samfile.name)
                 os.unlink(bamfile.name)
 
-                ps = Popen(['../bin/bam-to-alignment-priors', '--ignore_xa', '--unsorted', '--single-end', reference, 'single.bam'], stdout=PIPE, stderr=DEVNULL)
-
-                check_call(['sort', '-k6,6', '-g'], stdin=ps.stdout, stdout=priorfile)
-                ps.wait()
+                check_call(['../bin/bam-to-alignment-priors', '--ignore_xa', '--unsorted', '--single-end', reference, 'single.bam'], stdout=priorfile, stderr=DEVNULL)
 
                 os.unlink('single.bam')
 
+def sortprior(prior):
+    """Sort prior file as expected from haploclique"""
+
+    with tempfile.NamedTemporaryFile() as tf:
+
+        shutil.copy2(prior, tf.name)
+    
+        with open(prior, 'w') as priorfile:
+            check_call(['sort', '-k6,6', '-g'], stdin=tf, stdout=priorfile)
+
 def main(argv):
-    """This script is basically a python wrapping for haploclique and is a simple version
+    """Run haploclique on paired-end reads in bam format.
+
+    This script is basically a python wrapping for haploclique and is a simple version
     of the haploclique-assembly shell script.
 
     Use ['-h'] or ['--help--'] as arguments to display a usage message

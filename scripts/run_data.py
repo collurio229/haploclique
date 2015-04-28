@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-This script runs haploclique on the given reference sequence and
+"""This script runs haploclique on the given reference sequence and
 bam alignment and compares the results with the given haplotype sequences.
 
 Usage:
@@ -16,6 +15,8 @@ Usage:
 Options:
   -i <num>, --iterations <num>  number of haploclique iterations [default: 5]
   --path                        Sets path variable to /haploclique/bin
+  --metric                      Compute match metric between quasispecies
+                                and haplotypes
 """
 
 from subprocess import call
@@ -76,8 +77,8 @@ def parseLog(logfile):
 
     for line in logfile:
 
-        for key, regex in regexes:
-            m = regex.match(line)
+        for key, regex in regexes.items():
+            m = regex.match(str(line))
 
             if (m):
                 if key == 'method':
@@ -87,7 +88,7 @@ def parseLog(logfile):
                     log[m.group('name')] = m.group('digit')
                     break
                 else:
-                    log[m.group('name') = True
+                    log[m.group('name')] = True
                     break
                     
                     
@@ -101,6 +102,8 @@ def main(argv):
     or look into the module __doc__"""
 
     args = docopt(__doc__, argv=argv)
+
+    progress('Opening archive', False)
 
     archive = tarfile.open(args['<input>'], 'r:gz')
 
@@ -126,8 +129,8 @@ def main(argv):
 
     log = parseLog(logfile)
 
-	if not log['no_ref']:
-		haplofiles.append(ref)
+    if not log['no_ref']:
+        haplofiles.append(ref)
 
     # set the PATH variable to local haploclique binary
     if args['--path']:
@@ -135,25 +138,36 @@ def main(argv):
         os.environ['PATH'] = '/home/stud/lanber/usr/lib/jvm/java-7-openjdk-amd64/jre/bin:/home/stud/lanber/usr/bin:' + pathvar + ':' + os.path.realpath('../bin') + ':' + os.path.realpath('.')
         os.environ['SAF'] = os.path.realpath('../bin')
 
+    progress('Creating bam index', False)
+
     if call(['samtools', 'index', path + '/' + reads]):
         raise ExternalError('Index creation failed')
 
+    progress('Calling haploclique')
+
     haploclique.main(['--iterations', str(args['--iterations']), path + '/' + ref, path + '/' + reads])
+
+    done('Calling haploclique')
 
     quasispecies = readFASTA('./quasispecies.fasta')
     ref_sequences = []
 
-    for hf in haplofiles:
-        ref_sequences.extend(readFASTA(path + '/' + hf))
+    if(args['--metric']):
+        progress('Computing match metric', False)
 
-    print('forward error:', compute_best_match_score(ref_sequences, quasispecies))
-    print('backward error:', compute_best_match_score(quasispecies, ref_sequences))
+        for hf in haplofiles:
+            ref_sequences.extend(readFASTA(path + '/' + hf))
+
+        print('forward error:', compute_best_match_score(ref_sequences, quasispecies))
+        print('backward error:', compute_best_match_score(quasispecies, ref_sequences))
 
     remove_directory(path)
 
     # clean PATH variable
     if args['--path']:
         os.environ['PATH'] = pathvar
+
+    all_done()
 
 if __name__ == '__main__':
     main(sys.argv[1:])

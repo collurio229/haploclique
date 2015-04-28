@@ -35,7 +35,7 @@ class Sequence:
 
         r = random.randint(0, len(self.sequence)-1)
         
-        return sequence[r]
+        return self.sequence[r]
 
     def create_snp(self, dist_fn=lambda self: self.sample_base(), pos=-1):
         """Creates one single nucleotide polymorphism in the sequence.
@@ -44,7 +44,8 @@ class Sequence:
         of the sequence and the position where to create the snp.
 
         If pos=-1, then the position will be randomly sampled in the sequence. If you want
-        to insert a specific base N, use lambda self: 'N'"""
+        to insert a specific base N, use lambda self: 'N'
+		"""
 
         if pos < 0 or pos > len(self.sequence):
             pos = random.randint(0, len(self.sequence)-1)
@@ -59,7 +60,8 @@ class Sequence:
         The inserted bases are generated with the distribution function dist_fn and are
         inserted at position pos.
 
-        If pos=-1, then the position will be randomly sampled in the sequence."""
+        If pos=-1, then the position will be randomly sampled in the sequence.
+		"""
 
         length = int(random.gauss(mean, std_dev))
 
@@ -78,7 +80,8 @@ class Sequence:
         """Create a deletion of length mean with standard deviation std_dev.
 
         The position is pos, if pos is -1, then the position will be randomly
-        sampled."""
+        sampled.
+		"""
 
         length = int(random.gauss(mean, std_dev))
 
@@ -128,7 +131,7 @@ class Sequence:
         return matrix[m-1][n-1]
 
 class ParsingError(Exception):
-    """Use this error class, if an error in parsing of a FASTA file occured"""
+    """Use this error class, if an error while parsing a (FASTA) file occured"""
 
     def __init__(self, message):
         self.message = message
@@ -137,8 +140,11 @@ class ParsingError(Exception):
         return repr(self.message)
 
 def compute_best_match_score(forward_set, backward_set):
-    """Computes the mean root square error from the best edit distances between
-    the sequences in the forward set and the backward_set."""
+    """Compute the quality of match between the sequences in the two sets.
+
+	Computes the mean root square error from the best edit distances between
+    the sequences in the forward set and the backward_set.
+	"""
 
     score = 0
 
@@ -158,7 +164,8 @@ def readFASTA(filename):
     """Create all Sequences included in a FASTA file.
 
     Because a FASTA file can include more than one sequences, this
-    function returns a list of sequences."""
+    function returns a list of sequences.
+	"""
 
     with open(filename, 'r') as f:
         header = f.readline()

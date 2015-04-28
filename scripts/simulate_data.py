@@ -40,6 +40,11 @@ import tempfile
 import sys
 import os
 
+try:
+    from subprocess import DEVNULL
+except ImportError:
+    DEVNULL = open(os.devnull, 'wb')
+
 from progressdone import *
 from Sequence import *
 
@@ -74,16 +79,14 @@ def main(argv):
     args['--number'] = int(args['--number'])
     args['--coverage'] = int(args['--coverage'])
 
-    progress('Reading input sequence')
+    progress('Reading input sequence', False)
 
     ref_genome = readFASTA(args['<input>'])[0]
 
     base = os.path.basename(args['<input>'])
     filename = os.path.splitext(base)[0]
 
-    done('Reading input sequence')
-
-    progress('Creating output file')
+    progress('Creating output file', False)
 
     if not args['<output>']:
         args['<output>'] = 'sht_' + filename + '.tar.gz'
@@ -91,9 +94,7 @@ def main(argv):
     tar = tarfile.open(args['<output>'], 'w:gz')
     tar.add(args['<input>'], arcname='ref_' + base)
 
-    done('Creating output file')
-
-    progress('Writing logfile')
+    progress('Writing logfile', False)
 
     with tempfile.NamedTemporaryFile(prefix= 'log_', suffix='.log', delete=False) as logfile:
         log = logfile.name        
@@ -120,7 +121,6 @@ def main(argv):
     tar.add(log, arcname= 'args_' + filename + '.log')
 
     os.unlink(log)
-    done('Writing logfile')
 
     progress('Creating new haplotypes')
     subprogress_init_counter()
@@ -128,9 +128,6 @@ def main(argv):
     n = args['--number']
 
     haplofiles = []
-
-    if not args['--no_ref']:
-        haplofiles.append(args['<input>'])
 
     for i in range(0, n):
 
@@ -164,14 +161,18 @@ def main(argv):
 
     done('Creating new haplotypes')
 
+    if not args['--no_ref']:
+        haplofiles.append(args['<input>'])
+        n += 1
+
     samfiles = []
 
     progress('Simulating sequence reads')
     subprogress_init_counter()
 
-    subprogress(n+1, 'Creating bwa index')
+    subprogress(4*n+1, 'Creating bwa index')
 
-    if call(['bwa', 'index', '-p', 'tmp_index', args['<input>']]):
+    if call(['bwa', 'index', '-p', 'tmp_index', args['<input>']], stdout=DEVNULL, stderr=DEVNULL):
         raise ExternalError('Failed to create an index for alignment')
 
     for hf in haplofiles:
@@ -192,26 +193,26 @@ def main(argv):
                 '--out', raw_sam.name,
                 '--reference', hf,
                 '--read_number', str(int(args['--coverage'] * len(ref_genome.sequence))),
-                '--error', '../data/miseq_250bp.txt']):
+                '--error', '../data/miseq_250bp.txt'], stdout=DEVNULL, stderr=DEVNULL):
             raise ExternalError('SimSeq failed for ' + hf)
     
-        subprogress(4*n+1, 'Creating sequence dictionary for haplotype %%')
+        subprogress(4*n+1, 'Creating sequence dictionary for haplotype %%', lambda x: x-1)
 
-        if call(['java', '-jar', '-Xmx2g', '../bin/picard.jar', 'CreateSequenceDictionary', 'REFERENCE=' + hf, 'OUTPUT=/tmp/dict.sam', 'VERBOSITY=ERROR']):
+        if call(['java', '-jar', '-Xmx2g', '../bin/picard.jar', 'CreateSequenceDictionary', 'REFERENCE=' + hf, 'OUTPUT=/tmp/dict.sam', 'VERBOSITY=ERROR'], stdout=DEVNULL, stderr=DEVNULL):
             raise ExternalError('Picard failed to create a sequence dictionary for ' + hf)
 
         with open('/tmp/dict.sam', 'a') as header, open(raw_sam.name, 'r') as sam_input:
             for line in sam_input:
                 header.write(line)
 
-        subprogress(4*n+1, 'Converting reads of haplotype %% to fastq format')
+        subprogress(4*n+1, 'Converting reads of haplotype %% to fastq format', lambda x: x-2)
 
-        if call(['java', '-jar', '-Xmx2g', '../bin/picard.jar', 'SamToFastq', 'INPUT=/tmp/dict.sam', 'FASTQ=' + read1.name, 'SECOND_END_FASTQ=' + read2.name, 'VALIDATION_STRINGENCY=LENIENT', 'VERBOSITY=ERROR']):
+        if call(['java', '-jar', '-Xmx2g', '../bin/picard.jar', 'SamToFastq', 'INPUT=/tmp/dict.sam', 'FASTQ=' + read1.name, 'SECOND_END_FASTQ=' + read2.name, 'VALIDATION_STRINGENCY=LENIENT', 'VERBOSITY=ERROR'], stdout=DEVNULL, stderr=DEVNULL):
             raise ExternalError('Picard failed to convert ' + raw_sam.name + ' to fastq')
 
-        subprogress(4*n+1, 'Aligning reads of haplotype %% to reference genome')
+        subprogress(4*n+1, 'Aligning reads of haplotype %% to reference genome', lambda x: x-3)
 
-        if call(['bwa', 'mem', 'tmp_index', read1.name, read2.name], stdout=end_sam):
+        if call(['bwa', 'mem', 'tmp_index', read1.name, read2.name], stdout=end_sam, stderr=DEVNULL):
             raise ExternalError('bwa failed to align ' + read1.name + ', ' + read2.name)
 
         end_sam.close()
@@ -244,7 +245,7 @@ def main(argv):
     for sf in samfiles:
         options.append('INPUT=' + sf)
 
-    if call(options):
+    if call(options, stdout=DEVNULL, stderr=DEVNULL):
         raise ExternalError('Picard failed at merging all sam files')
 
     done('Merging sam files')
@@ -260,20 +261,18 @@ def main(argv):
 
         done('Validating merged sam file')
 
-    progress('Converting reads to bam format')
+    progress('Converting reads to bam format', False)
 
     bamf = tempfile.NamedTemporaryFile(prefix='res_', suffix='.bam', delete=False)
     bamf.close()
 
     options = ['java', '-jar', '-Xmx2g', '../bin/picard.jar', 'SamFormatConverter', 'INPUT=' + samf.name, 'OUTPUT=' + bamf.name, 'VERBOSITY=ERROR']
 
-    if call(options):
+    if call(options, stdout=DEVNULL, stderr=DEVNULL):
         raise ExternalError('Picard failed to convert ' + samf.name + ' to bam')
 
-    progress('Adding read alignment file to output file')
+    progress('Adding read alignment file to output file', False)
     tar.add(bamf.name, arcname='reads_' + filename + '.bam')
-
-    done('Adding reads to output file')
 
     os.unlink(samf.name)
     os.unlink(bamf.name)
