@@ -126,6 +126,9 @@ def main(argv):
 
     log = parseLog(logfile)
 
+	if not log['no_ref']:
+		haplofiles.append(ref)
+
     # set the PATH variable to local haploclique binary
     if args['--path']:
         pathvar = os.environ['PATH']
