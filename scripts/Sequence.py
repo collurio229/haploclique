@@ -149,7 +149,7 @@ def compute_best_match_score(forward_set, backward_set):
     score = 0
 
     for seq in forward_set:
-        result = seq.edit_dist(forward_set[0])
+        result = seq.edit_dist(backward_set[0])
 
         for comp in backward_set[1:]:
             res = seq.edit_dist(comp)
@@ -158,7 +158,7 @@ def compute_best_match_score(forward_set, backward_set):
         
         score += result*result
 
-    return sqrt(score)
+    return sqrt(score) / len(forward_set)
 
 def readFASTA(filename):
     """Create all Sequences included in a FASTA file.

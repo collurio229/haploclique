@@ -27,6 +27,15 @@ try:
 except ImportError:
     DEVNULL = open(os.devnull, 'wb')
 
+class ParsingError(Exception):
+    """Use this error class, if an error while parsing a (FASTA) file occured"""
+
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        return repr(self.message)
+
 def initialize(reference, alignment):
     """Generate paired alignment priors from bam file"""
 
@@ -104,6 +113,8 @@ def assemble(reference, read1, read2, read_single, prior):
 
                 check_call(['../bin/bam-to-alignment-priors', '--ignore_xa', reference, 'paired.bam'], stdout=priorfile, stderr=DEVNULL)
 
+                os.unlink('paired.bam')
+
         if (os.path.exists(read_single)):
             if (os.path.getsize(read_single) != 0):
 
@@ -123,6 +134,9 @@ def assemble(reference, read1, read2, read_single, prior):
                 check_call(['../bin/bam-to-alignment-priors', '--ignore_xa', '--unsorted', '--single-end', reference, 'single.bam'], stdout=priorfile, stderr=DEVNULL)
 
                 os.unlink('single.bam')
+
+    if (os.path.getsize(read_single) == 0 and os.path.getsize(read1) == 0 and os.path.getsize(read2) == 0):
+        raise ParsingError('All clique data files are empty!')
 
 def sortprior(prior):
     """Sort prior file as expected from haploclique"""
@@ -159,7 +173,9 @@ def main(argv):
 
         cliques, uniques, cputime = haploclique(prior)
 
-        if cliques == 0:
+        print(cliques, uniques, cputime)
+
+        if cliques == 0 or uniques < 5:
             print('Converged after', i+1, 'runs')
             break
 

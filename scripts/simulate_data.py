@@ -102,9 +102,9 @@ def main(argv):
         if args['--snp']:
             logfile.write(bytes('method: snp\n', 'UTF-8'))
         elif args['--ins']:
-            logfile.write(bytes('method: insert\n', 'UTF-8'))
+            logfile.write(bytes('method: ins\n', 'UTF-8'))
         elif args['--del']:
-            logfile.write(bytes('method: delete\n'))
+            logfile.write(bytes('method: del\n', 'UTF-8'))
 
         logfile.write(bytes('mean: ' + str(args['--mean']) + '\n', 'UTF-8'))
         logfile.write(bytes('sigma: ' + str(args['--sigma']) + '\n', 'UTF-8'))

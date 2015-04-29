@@ -25,7 +25,7 @@ def subprogress_init_counter():
     global sub_ct
     sub_ct = 0
 
-def subprogress(num, msg='', counter=True, fn_filter=(lambda x: x)):
+def subprogress(num, msg='', counter=True, fn_filter=lambda x: x):
     """Print subprogress message with progress percentage.
 
     You can use %% inside the message string to insert the current counter value
