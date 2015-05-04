@@ -6,3 +6,9 @@ htslib/*
 *.pyc
 .*
 *.tar.gz
+alignmentparser
+haploclique
+bam-to-alignment-priors
+seeksingletons
+quasispecies.fasta
+data/test/*

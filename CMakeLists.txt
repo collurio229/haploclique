@@ -24,6 +24,8 @@ IF(NOT CMAKE_BUILD_TYPE)
 	SET(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build, options are: Debug Release Profile" FORCE)
 ENDIF(NOT CMAKE_BUILD_TYPE)
 
+SET(RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/bin)
+
 enable_testing()
 
 find_package(Boost 1.36 COMPONENTS program_options iostreams unit_test_framework REQUIRED)
