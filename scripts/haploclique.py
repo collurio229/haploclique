@@ -13,6 +13,7 @@ Usage:
 
 Options:
   -i <num>, --iterations <num>  number of haploclique iterations. [default: 1]
+  --no-singletons                don't use singletons for new iterations
 """
 
 from subprocess import check_call, Popen, PIPE, CalledProcessError
@@ -76,6 +77,8 @@ def haploclique(prior):
             if m:
                 ret_vals = (int(m.group('cliques')), int(m.group('uniques')), int(m.group('cputime')))
  
+    check_call(['../bin/seeksingletons'])
+
     return ret_vals 
 
 def assemble(reference, read1, read2, read_single, prior):
@@ -154,7 +157,7 @@ def main(argv):
     This script is basically a python wrapping for haploclique and is a simple version
     of the haploclique-assembly shell script.
 
-    Use ['-h'] or ['--help--'] as arguments to display a usage message
+    Use ['-h'] or ['--help'] as arguments to display a usage message
     or look into the module __doc__"""
 
     args = docopt(__doc__, argv=argv)
@@ -171,9 +174,11 @@ def main(argv):
         except OSError:
             pass
 
-        cliques, uniques, cputime = haploclique(prior)
+        if not args['--no-singletons'] and os.path.exists('singles.prior'):
+            check_call(r'sort -u -t" " -k1,1 singles.prior >> ' + prior, shell=True, stderr=DEVNULL)
+            os.unlink('singles.prior')
 
-        print(cliques, uniques, cputime)
+        cliques, uniques, cputime = haploclique(prior)
 
         if cliques == 0 or uniques < 5:
             print('Converged after', i+1, 'runs')
@@ -189,6 +194,8 @@ def main(argv):
     os.unlink('data_cliques_single.fastq')
     os.unlink('data_clique_to_reads.tsv')
     os.unlink(prior)
+    if os.path.exists('singles.prior'):
+        os.unlink('singles.prior')
 
 if __name__ == '__main__':
     main(sys.argv[1:])
