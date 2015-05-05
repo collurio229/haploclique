@@ -34,6 +34,7 @@
 #include "AlignmentRecord.h"
 #include "QuasispeciesEdgeCalculator.h"
 #include "CliqueFinder.h"
+#include "CLEVER.h"
 #include "CliqueWriter.h"
 #include "CoverageMonitor.h"
 #include "HistogramBasedDistribution.h"
@@ -239,16 +240,16 @@ int main(int argc, char* argv[]) {
         indel_os = new ofstream(indel_output_file.c_str());
     }
     CliqueWriter clique_writer(cout, variation_caller, indel_os, read_groups, false, output_all, fdr, verbose, super_read_min_coverage, frameshift_merge, suffix, minimal_superread_length);
-    CliqueFinder clique_finder(*edge_calculator, clique_writer, read_groups, no_sort);
+    CliqueFinder* clique_finder = new CLEVER(*edge_calculator, clique_writer, read_groups, no_sort);
     if (indel_edge_calculator != 0) {
-        clique_finder.setSecondEdgeCalculator(indel_edge_calculator);
+        clique_finder->setSecondEdgeCalculator(indel_edge_calculator);
     }
     EdgeWriter* edge_writer = 0;
     ofstream* edge_ofstream = 0;
     if (edge_filename.size() > 0) {
         edge_ofstream = new ofstream(edge_filename.c_str());
         edge_writer = new EdgeWriter(*edge_ofstream);
-        clique_finder.setEdgeWriter(*edge_writer);
+        clique_finder->setEdgeWriter(*edge_writer);
     }
     ofstream* reads_ofstream = 0;
     if (reads_output_filename.size() > 0) {
@@ -296,13 +297,13 @@ int main(int argc, char* argv[]) {
             }*/
             bool time = ((double) (clock() - clock_start) / CLOCKS_PER_SEC / 60) > time_limit;
             if (max_coverage > 0 || time) {
-                if (clique_finder.getCoverageMonitor().probeAlignment(*alignment_autoptr) > (size_t) max_coverage || time) {
+                if (clique_finder->getCoverageMonitor().probeAlignment(*alignment_autoptr) > (size_t) max_coverage || time) {
                 // cout << "Skipping alignment (coverage): "  << alignment_autoptr->getName()  << endl;
                     skipped_by_coverage += 1;
                     continue;
                 }
             }
-            clique_finder.addAlignment(alignment_autoptr);
+            clique_finder->addAlignment(alignment_autoptr);
         } catch (std::runtime_error&) {
             cerr << "Error parsing input, offending line: " << n << endl;
             return 1;
@@ -310,7 +311,7 @@ int main(int argc, char* argv[]) {
         cerr << "\rSTATUS: " << total_alignments;
         cerr.flush();
     }
-    clique_finder.finish();
+    clique_finder->finish();
     clique_writer.finish();
     cerr << endl;
 
@@ -325,6 +326,7 @@ int main(int argc, char* argv[]) {
         delete edge_writer;
         delete edge_ofstream;
     }
+    if (clique_finder != 0) delete clique_finder;
     if (reads_ofstream != 0) {
         delete reads_ofstream;
     }

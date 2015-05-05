@@ -23,33 +23,24 @@
 #include <boost/dynamic_bitset.hpp>
 #include <ctime>
 #include <map>
-#include "CliqueFinder.h"
+#include "CLEVER.h"
 
 using namespace std;
 using namespace boost;
 
-CliqueFinder::CliqueFinder(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort) : clique_collector(clique_collector), edge_calculator(edge_calculator), coverage_monitor(read_groups) {
-	cliques = new clique_list_t();
-	capacity = alignment_set_t::bits_per_block;
-	alignments = new AlignmentRecord*[capacity];
+CLEVER::CLEVER(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort) : CliqueFinder(edge_calculator, clique_collector, read_groups) {
 	next_id = 0;
-	alignment_count = 0;
-	edge_writer = 0;
-	second_edge_calculator = 0;
 	this->no_sort = no_sort;
 }
 
-CliqueFinder::~CliqueFinder() {
+CLEVER::~CLEVER() {
 	if (cliques!=0) {
 		finish();
 	}
-	for (size_t i=0; i<alignment_count; ++i) {
-		delete alignments[i];
-	}
-	delete [] alignments;
+	
 }
 
-void CliqueFinder::reorganize_storage() {
+void CLEVER::reorganize_storage() {
 	alignment_set_t set_union(capacity);
 	clique_list_t::iterator it = cliques->begin();
 	for (;it!=cliques->end(); ++it) {
@@ -104,7 +95,7 @@ void CliqueFinder::reorganize_storage() {
 	capacity = new_capacity;
 }
 
-void CliqueFinder::addAlignment(std::auto_ptr<AlignmentRecord> alignment_autoptr) {
+void CLEVER::addAlignment(std::auto_ptr<AlignmentRecord> alignment_autoptr) {
 	assert(alignment_autoptr.get() != 0);
 	assert(cliques!=0);
 	alignment_id_t id = next_id++;
@@ -241,7 +232,7 @@ void CliqueFinder::addAlignment(std::auto_ptr<AlignmentRecord> alignment_autoptr
 	*/
 }
 
-void CliqueFinder::finish() {
+void CLEVER::finish() {
 	if (edge_writer != 0) {
 		edge_writer->finish();
 	}
@@ -252,10 +243,4 @@ void CliqueFinder::finish() {
 	}
 	delete cliques;
 	cliques = 0;
-}
-
-const AlignmentRecord& CliqueFinder::getAlignmentByIndex(size_t index) const {
-	assert(index<alignment_count);
-	// cout << "CliqueFinder::getAlignmentByIndex("<< index << ")" << endl;
-	return *(alignments[index]);
 }

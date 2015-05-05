@@ -41,7 +41,7 @@ add_executable ( bam-to-alignment-priors
 
 add_executable (haploclique
 	haploclique.cpp
-	CliqueFinder.cpp
+	CLEVER.cpp
 	Clique.cpp
 	QuasispeciesEdgeCalculator.cpp
 	GaussianEdgeCalculator.cpp
