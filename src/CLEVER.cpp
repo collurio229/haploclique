@@ -28,16 +28,14 @@
 using namespace std;
 using namespace boost;
 
-CLEVER::CLEVER(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort) : CliqueFinder(edge_calculator, clique_collector, read_groups) {
-	next_id = 0;
-	this->no_sort = no_sort;
+CLEVER::CLEVER(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort) : CliqueFinder(edge_calculator, clique_collector, read_groups, no_sort) {
+
 }
 
 CLEVER::~CLEVER() {
 	if (cliques!=0) {
 		finish();
 	}
-	
 }
 
 void CLEVER::reorganize_storage() {
@@ -230,17 +228,4 @@ void CLEVER::addAlignment(std::auto_ptr<AlignmentRecord> alignment_autoptr) {
 		cout << "    " << **clique_it << endl;
 	}
 	*/
-}
-
-void CLEVER::finish() {
-	if (edge_writer != 0) {
-		edge_writer->finish();
-	}
-	clique_list_t::iterator clique_it = cliques->begin();
-	for (;clique_it!=cliques->end(); ++clique_it) {
-		Clique* clique = *clique_it;
-		clique_collector.add(auto_ptr<Clique>(clique));
-	}
-	delete cliques;
-	cliques = 0;
 }

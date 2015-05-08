@@ -32,8 +32,6 @@ class CLEVER : public CliqueFinder {
 private:
     typedef std::pair<unsigned int,size_t> length_and_index_t;
     std::set<length_and_index_t> alignments_by_length;
-    alignment_id_t next_id;
-    bool no_sort;
     void reorganize_storage();
 
     typedef struct {
@@ -78,7 +76,6 @@ public:
     CLEVER(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort);
     virtual ~CLEVER();
     void addAlignment(std::auto_ptr<AlignmentRecord> ap);
-    void finish();
 };
 
 #endif /* CLEVER_H_ */
