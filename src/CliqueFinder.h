@@ -21,8 +21,7 @@ protected:
 
     typedef std::list<Clique*> clique_list_t;
     clique_list_t *cliques;    
-    size_t capacity;
-    AlignmentRecord **alignments;
+
     size_t alignment_count;
     EdgeWriter *edge_writer;
     const EdgeCalculator *second_edge_calculator;
@@ -31,18 +30,13 @@ protected:
 public:
     CliqueFinder(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort) : edge_calculator(edge_calculator), clique_collector(clique_collector), coverage_monitor(read_groups), no_sort(no_sort) {
         cliques = new clique_list_t();
-	    capacity = alignment_set_t::bits_per_block;
-	    alignments = new AlignmentRecord*[capacity];
     	alignment_count = 0;
     	edge_writer = 0;
     	second_edge_calculator = 0;
         next_id = 0;
     }
     virtual ~CliqueFinder() {
-        for (size_t i=0; i<alignment_count; ++i) {
-	    	delete alignments[i];
-	    }
-	    delete [] alignments;
+        
     }
 
     virtual void addAlignment(std::auto_ptr<AlignmentRecord> ap) = 0;

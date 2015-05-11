@@ -30,6 +30,9 @@
 /** Implementation of the Maximal Clique Enumeration algorithm of CLEVER */
 class CLEVER : public CliqueFinder {
 private:
+    size_t capacity;
+    AlignmentRecord **alignments;
+
     typedef std::pair<unsigned int,size_t> length_and_index_t;
     std::set<length_and_index_t> alignments_by_length;
     void reorganize_storage();

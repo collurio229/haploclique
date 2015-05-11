@@ -29,13 +29,18 @@ using namespace std;
 using namespace boost;
 
 CLEVER::CLEVER(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort) : CliqueFinder(edge_calculator, clique_collector, read_groups, no_sort) {
-
+    capacity = alignment_set_t::bits_per_block;
+    alignments = new AlignmentRecord*[capacity];
 }
 
 CLEVER::~CLEVER() {
-	if (cliques!=0) {
+	if (cliques!=nullptr) {
 		finish();
 	}
+    for (size_t i=0; i<alignment_count; ++i) {
+    	delete alignments[i];
+    }
+    delete [] alignments;
 }
 
 void CLEVER::reorganize_storage() {
