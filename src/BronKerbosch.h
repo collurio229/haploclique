@@ -21,10 +21,15 @@ private:
 
     void degeneracy_order();
     void bronkerbosch(alignment_set_t R, alignment_set_t P, alignment_set_t X);
-    unsigned int pivot(alignment_set_t& P, alignment_set_t& X);
+    size_type pivot(alignment_set_t& P, alignment_set_t& X);
 public:
     BronKerbosch(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort);
     virtual ~BronKerbosch();
+
+    virtual const AlignmentRecord & getAlignmentByIndex(size_t index) const {
+        assert(index<alignment_count);
+    	return *(alignments_[index]);
+    }
 
     void addAlignment(std::auto_ptr<AlignmentRecord> ap);
     void finish();

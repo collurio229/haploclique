@@ -10,19 +10,35 @@ BronKerbosch::BronKerbosch(const EdgeCalculator& edge_calculator, CliqueCollecto
     degree_map_ = new degree_map_t();
     actives_ = new list<adjacency_list_t*>();
     vertices_as_lists_ = new vector<adjacency_list_t*>();
-
-    min_key_ = 0;
-    max_key_ = 0;
 }
 
 BronKerbosch::~BronKerbosch() {
     if (cliques != nullptr) {
         finish();
     }
+    for (auto&& alignment : alignments_) {
+        delete alignment;
+    }
+    delete order_;
+    delete vertices_;
 }
 
 void BronKerbosch::finish() {
     degeneracy_order();
+
+    bronkerbosch(alignment_set_t(alignment_count), alignment_set_t(alignment_count).flip(), alignment_set_t(alignment_count));
+
+    if (no_sort == 0) {
+		sort(cliques.begin(), cliques.end(), clique_comp_t());
+		// cliques.erase(std::unique(cliques.begin(), cliques.end(),clique_equal_t()), cliques.end());
+	}
+
+    for (auto clique_it = cliques->begin();clique_it!=cliques->end(); ++clique_it) {
+    	Clique* clique = *clique_it;
+        clique_collector.add(auto_ptr<Clique>(clique));
+   }
+	    delete cliques;
+	    cliques = nullptr;
 }
 
 void BronKerbosch::degeneracy_order() {
@@ -53,7 +69,9 @@ void BronKerbosch::degeneracy_order() {
                 iterator++;
             }
         }
-        order_->push_back(list_vertex->second);
+        order_->push_back(list_vertex->first);
+
+        delete list_vertex;
     }
 
     delete degree_map_;
@@ -61,14 +79,39 @@ void BronKerbosch::degeneracy_order() {
     delete vertices_as_lists_;
 }
 
+size_type BronKerbosch::pivot(alignment_set_t& P, alignment_set_t& X) {
+    unit = P | X;
+    size_type max_size = 0;
+    size_type index = alignment_set_t::npos;
+
+    for(size_type i = unit.find_first(); i != alignment_set_t::npos; i = unit.find_next(i)) {
+        size_type new_size = (P & (*vertices_)[i]).count();        
+
+        if ( new_size > max_size ) {
+            max_size = new_size;
+            index = i;
+        }
+    }
+
+    assert(index != alignment_set_t::npos);
+
+    return index;
+}
+
 void BronKerbosch::bronkerbosch(alignment_set_t R, alignment_set_t P, alignment_set_t X) {
     if (P.none() and X.none()) {
         cliques->push_back(new Clique(*this, R));
     }
 
-    alignment_set_t pivot = choosePivot(P | X);
+    size_type pivot = pivot(P, X);
+    comp = P - (*vertices_)[pivot];
 
-    for (v in P
+    for (size_type i = comp.find_first(); i != alignment_set_t::npos; i = comp.find_next(i)) {
+        bronkerbosch(R.set(i), P & (*vertices_)[i], X & (*vertices_)[i]);
+
+        P.reset(i);
+        X.set(i);
+    }
 }
 
 void BronKerbosch::addAlignment(std::auto_ptr<AlignmentRecord> ap) {
