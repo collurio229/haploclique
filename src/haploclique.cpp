@@ -24,7 +24,8 @@
 #include <cassert>
 #include <ctime>
 
-#include <boost/program_options.hpp>
+#include "docopt/docopt.h"
+
 #include <boost/tokenizer.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
@@ -50,28 +51,106 @@
 
 using namespace std;
 using namespace boost;
-namespace po = boost::program_options;
 
-void usage(const char* name, const po::options_description& options_desc) {
-    cerr << "Usage: " << name << " [options]" << endl;
-    cerr << endl;
-    cerr << "<distribution-file> file with assumed internal segment length distribution." << endl;
-    cerr << "                    in default mode, this is a file containing one line with" << endl;
-    cerr << "                    mean and standard deviation of the normal distribution" << endl;
-    cerr << "                    to be used. Such a file can be generated using option -m" << endl;
-    cerr << "                    of insert-length-histogram. Note that the \"internal segment\"" << endl;
-    cerr << "                    does NOT include the read (ends), i.e. a fragment disjointly" << endl;
-    cerr << "                    consists of two reads (read ends) and an internal segment." << endl;
-    cerr << endl;
-    cerr << "Reads alignments / alignment pairs from stdin and computes all cliques." << endl;
-    cerr << "Format for single-end reads:" << endl;
-    cerr << "<read-name> <read-nr> <read-group> <phred-sum> <chromosome> <start> <end> <strand> <cigar> <seq> <qualities> <aln-prob>" << endl;
-    cerr << "Format for paired-end reads:" << endl;
-    cerr << "<read-name> <pair-nr> <read-group> <phred-sum1> <chromosome1> <start1> <end1> <strand1> <cigar1> <seq1> <qualities1> <phred-sum2> <chromosome2> <start2> <end2> <strand2> <cigar2> <seq2> <qualities2> <aln-pair-prob> <aln-pair-prob-inslength>" << endl;
-    cerr << endl;
-    cerr << "NOTE: Lines are assumed to be ordered by field 6 (start1)." << endl;
-    cerr << endl;
-    cerr << options_desc << endl;
+static const char USAGE[] =
+R"(haploclique predicts haplotypes from NGS reads.
+
+Usage: haploclique (--clever | --bronkerbosch) [options]
+
+Reads alignments / alignment pairs from stdin and computes all cliques.
+Format for single-end reads:
+<read-name> <read-nr> <read-group> <phred-sum> <chromosome> <start> <end> <strand> <cigar> <seq> <qualities> <aln-prob>
+Format for paired-end reads:
+<read-name> <pair-nr> <read-group> <phred-sum1> <chromosome1> <start1> <end1> <strand1> <cigar1> <seq1> <qualities1> <phred-sum2> <chromosome2> <start2> <end2> <strand2> <cigar2> <seq2> <qualities2> <aln-pair-prob> <aln-pair-prob-inslength>
+
+NOTE: Lines are assumed to be ordered by field 6 (start1).
+
+--clever            Use the original CLEVER algorithm for enumerating maximal
+                    cliques.
+--bronkerbosch      Use the Bron-Kerbosch algorithm for enumerationg maximal
+                    cliques.
+
+<distribution-file> file with assumed internal segment length distribution.
+                    in default mode, this is a file containing one line with
+                    mean and standard deviation of the normal distribution
+                    to be used. Such a file can be generated using option -m
+                    of insert-length-histogram. Note that the
+                    "internal segment" does NOT include the read (ends), i.e.
+                    a fragment disjointly consists of two reads (read ends)
+                    and an internal segment.
+
+Options:
+  -v --verbose                Be verbose: output additional statistics for
+                              each variation.
+  -w --min_aln_weight NUM     Minimum weight of alignment pairs to be
+                              considered. [default: 0.0016]
+  -l --max_insert_length NUM  Maximum insert length of alignments to be
+                              considered (0=unlimited). [default: 50000]
+  -c --max_coverage NUM       Maximum allowed coverage. If exceeded,
+                              violating reads are ignored. The number of such
+                              ignored reads is printed to stderr
+                              (0=unlimited). [default: 200]
+  -e --write_edges FILE       Write edges to file of given name.
+  -f --fdr NUM                False discovery rate (FDR). [default: 0.1]
+  -a --all                    Output all cliques instead of only the
+                              significant ones. Cliques are not sorted and
+                              last column (FDR) is not computed.
+  -r --output_reads FILE      Output reads belonging to at least one
+                              significant clique to the given filename (along
+                              with their assignment to significant cliques).
+  -C --output_coverage FILE   Output the coverage with considered insert
+                              segments along the chromosome (one line per
+                              position) to the given filename.
+  -q --edge_quasi_cutoff_cliques NUM  End compatibility probability cutoff
+                                      between error-corrected reads for
+                                      quasispecies reconstruction.
+                                      [default: 0.99]
+  -k --edge_quasi_cutoff_mixed NUM    End compatibility probability cutoff
+                                      between raw<->error-corrected reads for
+                                      quasispecies reconstruction.
+                                      [default: 0.97]
+  -g --edge_quasi_cutoff_single NUM   End compatibility probability cutoff
+                                      between raw<->raw reads for
+                                      quasispecies reconstruction.
+                                      [default:0.95]
+  -Q --random_overlap_quality NUM     Probability that two random reads are
+                                      equal at the same position.
+                                      [default: 0.9]
+  -m --frame_shift_merge              Reads will be clustered if one has
+                                      single nucleotide deletions and
+                                      insertions. Use for PacBio data sets.
+  -o --min_overlap_cliques NUM        Minimum relative overlap between
+                                      error-corrected reads. [default: 0.9]
+  -j --min_overlap_single NUM         Minimum relative overlap between
+                                      raw<->raw and raw<->error-corrected
+                                      reads. [default: 0.6]
+  -s --super_read_min_coverage NUM    Minimum coverage for super-read
+                                      assembly. [default: 2]
+  -A --allel_frequencies FILE         ???
+  -I --call_indels FILE               Call indels from cliques. In this mode,
+                                      the classical "CLEVER" edge criterion
+                                      is used in addition to the new one.
+                                      Filename to write indels to must be
+                                      given as parameter.
+  -M --mean_and_sd_filename FILE      Name of file with mean and standard
+                                      deviation of insert size distribution
+                                      (only required if option -I is used).
+  -p --indel_edge_sig_level NUM       Significance level for "indel" edges
+                                      criterion, see option -I (the lower the
+                                      level, the more edges will be present).
+                                      [default: 0.2]
+  -t --time_limit NUM         Time limit for computation. If
+                              exceeded, non processed reads will be
+                              written to skipped.
+  -N --no_sort                Do not sort new clique w.r.t. their bitsets.
+  -S --suffix                 Suffix for clique names. Used for
+                              parallelization.
+  -L --minimal_super_read_length NUM
+                              Minimal super read length. [default: 0]  
+)";
+
+void usage() {
+    cerr << USAGE;
     exit(1);
 }
 
@@ -98,76 +177,50 @@ bool read_mean_and_sd(const string& filename, double* mean, double* sd) {
 }
 
 int main(int argc, char* argv[]) {
-    // PARAMETERS
-    double min_aln_weight;
-    double max_insert_length;
-    int max_coverage;
-    string edge_filename;
-    double fdr;
-    string reads_output_filename;
-    string coverage_output_filename;
-    bool verbose = false;
-    double edge_quasi_cutoff_cliques;
-    double edge_quasi_cutoff_single;
-    double edge_quasi_cutoff_mixed;
-    double Q;
-    double overlap_cliques;
-    double overlap_single;
-    bool frameshift_merge = false;
-    int super_read_min_coverage;
-    string allel_frequencies_path;
-    string mean_and_sd_filename = "";
-    string indel_edge_cutoff;
-    double indel_edge_sig_level;
-    string indel_output_file = "";
-    int time_limit;
-    bool no_sort;
-    string suffix;
-    int minimal_superread_length;
 
-    po::options_description options_desc("Allowed options");
-    options_desc.add_options()
-    ("verbose,v", po::value<bool>(&verbose)->zero_tokens(), "Be verbose: output additional statistics for each variation.")
-    ("min_aln_weight,w", po::value<double>(&min_aln_weight)->default_value(0.0016), "Minimum weight of alignment pairs to be considered.")
-    ("max_insert_length,l", po::value<double>(&max_insert_length)->default_value(50000), "Maximum insert length of alignments to be considered (0=unlimited).")
-    ("max_coverage,c", po::value<int>(&max_coverage)->default_value(200), "Maximum allowed coverage. If exceeded, violating reads are ignored. The number of such ignored reads is printed to stderr (0=unlimited).")
-    ("write_edges,e", po::value<string>(&edge_filename)->default_value(""), "Write edges to file of given name.")
-    ("fdr,f", po::value<double>(&fdr)->default_value(0.1), "False discovery rate (FDR).")
-    ("all,a", "Output all cliques instead of only the significant ones. Cliques are not sorted and last column (FDR) is not computed.")
-    ("output_reads,r", po::value<string>(&reads_output_filename)->default_value(""), "Output reads belonging to at least one significant clique to the given filename (along with their assignment to significant cliques.")
-    ("output_coverage,C", po::value<string>(&coverage_output_filename)->default_value(""), "Output the coverage with considered insert segments along the chromosome (one line per position) to the given filename.")
-    ("edge_quasi_cutoff_cliques,q", po::value<double>(&edge_quasi_cutoff_cliques)->default_value(0.99), "End compatibility probability cutoff between error-corrected reads for quasispecies reconstruction.")
-    ("edge_quasi_cutoff_mixed,k", po::value<double>(&edge_quasi_cutoff_mixed)->default_value(0.97), "End compatibility probability cutoff between raw<->error-corrected reads for quasispecies reconstruction.")
-    ("edge_quasi_cutoff_single,g", po::value<double>(&edge_quasi_cutoff_single)->default_value(0.95), "End compatibility probability cutoff between raw<->raw reads for quasispecies reconstruction.")
-    ("random_overlap_probability,Q", po::value<double>(&Q)->default_value(0.9), "Probability that two random reads are equal at the same position.")
-    ("frame_shift_merge,m", po::value<bool>(&frameshift_merge)->zero_tokens(), "Reads will be clustered if one has single nucleotide deletions and insertions. Use for PacBio data sets.")
-    ("min_overlap_cliques,o", po::value<double>(&overlap_cliques)->default_value(0.9), "Minimum relative overlap between error-corrected reads.")
-    ("min_overlap_single,j", po::value<double>(&overlap_single)->default_value(0.6), "Minimum relative overlap between raw<->raw and raw<->error-corrected reads.")
-    ("super_read_min_coverage,s", po::value<int>(&super_read_min_coverage)->default_value(2), "Minimum coverage for super-read assembly.")
-    ("allel_frequencies,A", po::value<string>(&allel_frequencies_path)->default_value(""), "Minimum coverage for super-read assembly.")
-    ("call_indels,I", po::value<string>(&indel_output_file)->default_value(""), "Call indels from cliques. In this mode, the \"classical CLEVER\" edge criterion is used in addition to the new one. Filename to write indels to must be given as parameter.")
-    ("mean_and_sd_filename,M", po::value<string>(&mean_and_sd_filename)->default_value(""), "Name of file with mean and standard deviation of insert size distribution (only required if option -I is used).")
-    ("indel_edge_sig_level,p", po::value<double>(&indel_edge_sig_level)->default_value(0.2), "Significance level for \"indel\" edges criterion, see option -I (the lower the level, the more edges will be present).")
-    ("time_limit,t", po::value<int>(&time_limit)->default_value(10), "Time limit for computation. If exceeded, non processed reads will be written to skipped.")
-    ("no_sort,N", po::value<bool>(&no_sort)->zero_tokens(), "Do not sort new clique w.r.t. their bitsets.")
-    ("suffix,S", po::value<string>(&suffix)->default_value(""), "Suffix for clique names. Used for parallelization.")
-    ("minimal_superread_length,L", po::value<int>(&minimal_superread_length)->default_value(0), "Minimal super-read length.")
-    ;
+    map<std::string, docopt::value> args
+        = docopt::docopt(USAGE,
+                         { argv + 1, argv + argc },
+                         true);
+    // PARAMETERS
+    double min_aln_weight = stod(args["--min_aln_weight"].asString());
+    double max_insert_length = stod(args["--max_insert_length"].asString());
+    long max_coverage = args["--max_coverage"].asLong();
+    string edge_filename = "";
+    if (args["--write_edges"]) edge_filename = args["--write_edges"].asString();
+    double fdr = stod(args["--fdr"].asString());
+    string reads_output_filename = "";
+    if (args["--output_reads"]) reads_output_filename = args["--output_reads"].asString();
+    string coverage_output_filename = "";
+    if (args["--output_coverage"]) coverage_output_filename = args["--output_coverage"].asString();
+    bool verbose = args["--verbose"].asBool();
+    double edge_quasi_cutoff_cliques = stod(args["--edge_quasi_cutoff_cliques"].asString());
+    double edge_quasi_cutoff_single = stod(args["--edge_quasi_cutoff_single"].asString());
+    double edge_quasi_cutoff_mixed = stod(args["--edge_quasi_cutoff_mixed"].asString());
+    double Q = stod(args["--random_overlap_quality"].asString());
+    double overlap_cliques = stod(args["--min_overlap_cliques"].asString());
+    double overlap_single = stod(args["--min_overlap_single"].asString());
+    bool frameshift_merge = args["--frame_shift_merge"].asBool();
+    long super_read_min_coverage = args["--super_read_min_coverage"].asLong();
+    string allel_frequencies_path = "";
+    if (args["--allel_frequencies"]) allel_frequencies_path = args["--allel_frequencies"].asString();
+    string mean_and_sd_filename = "";
+    if (args["--mean_and_sd_filename"]) mean_and_sd_filename = args["--mean_and_sd_filename"].asString();
+    string indel_edge_cutoff;
+    double indel_edge_sig_level = stod(args["--indel_edge_sig_level"].asString());
+    string indel_output_file = "";
+    if (args["--call_indels"]) indel_output_file = args["--call_indels"].asString();
+    long time_limit = args["--time_limit"].asLong();
+    bool no_sort = args["--no_sort"].asBool();
+    string suffix = "";
+    if (args["--suffix"]) suffix = args["--suffix"].asString();
+    long minimal_superread_length = args["--minimal_superread_length"].asLong();
+    // END PARAMETERS
 
     if (isatty(fileno(stdin))) {
-        usage(argv[0], options_desc);
+        usage();
     }
-
-    po::variables_map options;
-    try {
-        po::store(po::parse_command_line(argc, argv, options_desc), options);
-        po::notify(options);
-    } catch (std::exception& e) {
-        cerr << "error: " << e.what() << "\n";
-        return 1;
-    }
-
-    bool output_all = options.count("all") > 0;
+    bool output_all = args["--all"].asBool();
     if (output_all && (reads_output_filename.size() > 0)) {
         cerr << "Error: options -a and -r are mutually exclusive." << endl;
         return 1;
@@ -177,8 +230,6 @@ int main(int argc, char* argv[]) {
         cerr << "Error: when using option -I, option -M must also be given." << endl;
         return 1;
     }
-
-
 
     std::map<string,string> clique_to_reads_map;
     ifstream tsv_stream("data_clique_to_reads.tsv");

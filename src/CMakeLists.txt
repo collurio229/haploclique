@@ -67,6 +67,7 @@ add_executable (haploclique
 	PositionSet.cpp
 	Variation.cpp
 	NamedDnaSequence.cpp
+    docopt/docopt.cpp
 )
 
 target_link_libraries(bam-to-alignment-priors ${Boost_LIBRARIES} BamTools ${CMAKE_THREAD_LIBS_INIT})

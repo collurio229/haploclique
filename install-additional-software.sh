@@ -8,3 +8,5 @@ git clone -b master https://github.com/samtools/samtools
 cd samtools
 make
 cd ..
+
+git clone https://github.com/docopt/docopt.cpp.git src/docopt

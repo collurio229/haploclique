@@ -12,3 +12,4 @@ bam-to-alignment-priors
 seeksingletons
 quasispecies.fasta
 data/test/*
+src/docopt/*
