@@ -142,7 +142,7 @@ private:
         std::string cigar_string1;
         std::string cigar_string2;
 
-        clique_stats_t() : variation(), total_weight(0.0), clique_size(0), coverage(0), start(0), end(0), length(0), diff(0), pvalue_corr(0.0), fdr_level(-1.0), is_significant(false), best_sample_combination(-1), reads(0), window_start1(-1), window_end1(-1), window_start2(-1), window_end2(-1), clique_number(0), clique_size_weighted(0), maximum_coverage1(0), maximum_coverage2(0), hcount(0) {
+        clique_stats_t() : variation(), total_weight(0.0), clique_size(0), coverage(0), start(0), end(0), length(0), diff(0), pvalue_corr(0.0), fdr_level(-1.0), is_significant(false), best_sample_combination(-1), reads(0), window_start1(-1), window_end1(-1), window_start2(-1), window_end2(-1), clique_number(0), maximum_coverage1(0), maximum_coverage2(0), clique_size_weighted(0), hcount(0) {
         }
     } clique_stats_t;
 
@@ -189,20 +189,23 @@ private:
     typedef boost::bimap<std::string, size_t> readname_to_index_bimap_t;
 
     std::ostream& os;
+    /** This variation caller is used to perform significance tests on cliques. */
+    VariationCaller* variation_caller;
+    const ReadGroups* read_groups;
+
 	/** Output stream where indel calls are written to. If null, then no output is made. */
     /** Total number of processed cliques. */
 	std::ostream* indel_os;
+    /** Number of significant insertions (after FDR control). */
+    long long significant_ins_count;
+    /** Number of significant deletions (after FDR control). */
+    long long significant_del_count;
+
     long long total_count;
     /** Total number of all insertion-like cliques (i.e. includes non-significant). */
     size_t total_insertion_cliques;
     /** Total number of all deletion-like cliques (i.e. includes non-significant). */
     size_t total_deletion_cliques;
-    /** Number of significant insertions (after FDR control). */
-    long long significant_ins_count;
-    /** Number of significant deletions (after FDR control). */
-    long long significant_del_count;
-    /** This variation caller is used to perform significance tests on cliques. */
-    VariationCaller* variation_caller;
     /** If true, all cliques are output, not only significant ones. */
     bool output_all;
     /** Threshold for the false discovery rate (FDR). */
@@ -224,17 +227,16 @@ private:
     bool verbose;
     /** If true, then dataset is assumed to consist of multiple samples and each clique is evaluated accordingly. */
     bool multisample;
-    const ReadGroups* read_groups;
-    int min_coverage;
     int clique_count;
-    int paired_count;
+    int min_coverage;
     int single_count;
+    int paired_count;
     int single_skipped_count;
     bool FRAMESHIFT_MERGE;
-    std::map<std::string,fastq_entry> fastq_map;
     std::string suffix;
     int output_position;
     int minimal_superread_length;
+    std::map<std::string,fastq_entry> fastq_map;
 
     void writeReadlist();
     void callVariation(const std::vector<const AlignmentRecord*>& pairs, size_t coverage, clique_stats_t& stats);

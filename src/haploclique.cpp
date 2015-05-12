@@ -260,8 +260,8 @@ int main(int argc, char* argv[]) {
     size_t last_pos = 0;
     int n = 0;
     string line;
-    size_t skipped_by_weight = 0;
-    size_t skipped_by_length = 0;
+    // size_t skipped_by_weight = 0;
+    // size_t skipped_by_length = 0;
     size_t skipped_by_coverage = 0;
     size_t valid_alignments = 0;
     size_t total_alignments = 0;

@@ -184,7 +184,7 @@ void CLEVER::addAlignment(std::auto_ptr<AlignmentRecord> alignment_autoptr) {
 		new_cliques.push_back(new Clique(*this, index, capacity));
 	}
 	//clock_t clock_start = clock();
-	int clique_size_old = new_cliques.size();
+	//int clique_size_old = new_cliques.size();
 	if (no_sort == 0) {
 		sort(new_cliques.begin(), new_cliques.end(), clique_comp_t());
 		new_cliques.erase(std::unique(new_cliques.begin(), new_cliques.end(),clique_equal_t()), new_cliques.end());

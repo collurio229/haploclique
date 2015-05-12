@@ -27,6 +27,18 @@ protected:
     const EdgeCalculator *second_edge_calculator;
     alignment_id_t next_id;
 
+    typedef struct {
+        bool operator()(const Clique* c0,const Clique* c1) const {
+            return c0->getAlignmentSet() < c1->getAlignmentSet();
+        }
+    } clique_comp_t;
+
+    typedef struct {
+        bool operator()(const Clique* c0,const Clique* c1) const {
+            return c0->getAlignmentSet() == c1->getAlignmentSet();
+        }
+    } clique_equal_t;
+
 public:
     CliqueFinder(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort) : edge_calculator(edge_calculator), clique_collector(clique_collector), coverage_monitor(read_groups), no_sort(no_sort) {
         cliques = new clique_list_t();
@@ -56,10 +68,7 @@ public:
 
     virtual CoverageMonitor & getCoverageMonitor() { return coverage_monitor; }
 
-    virtual const AlignmentRecord & getAlignmentByIndex(size_t index) const {
-        assert(index<alignment_count);
-    	return *(alignments[index]);
-    }
+    virtual const AlignmentRecord & getAlignmentByIndex(size_t index) const = 0;
 
     virtual void setEdgeWriter(EdgeWriter& edge_writer) { this->edge_writer = &edge_writer; }
 

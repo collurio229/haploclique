@@ -37,47 +37,15 @@ private:
     std::set<length_and_index_t> alignments_by_length;
     void reorganize_storage();
 
-    typedef struct {
-        bool operator()(const Clique* c0,const Clique* c1) const {
-            // __uint128_t bitInteger = 0;
-            // int size = c0->getAlignmentSet().size();
-            // for (int j = 0; j < size; j++) {
-            //      if (c0->getAlignmentSet()[j]) {
-            //         bitInteger |= (1 << j);
-            //      }
-            //  }
-            //std::cerr << "SORT " << c0->leftmostSegmentStart() << "\t" << c1->leftmostSegmentStart();
-            // if (c0->leftmostSegmentStart() < c1->leftmostSegmentStart()) {
-                // std::cerr << "\t" << "!" << std::endl;
-                // return 1;
-            // }
-            // int size = c0->getAlignmentSet().size();
-            // if (size != c1->getAlignmentSet().size()) {
-            //     throw "Bit vector are of different size.";
-            // }
-            // for (int i = 0; i < size; i++) {
-            //     if (c0->getAlignmentSet()[i] != c1->getAlignmentSet()[i]) {
-            //         if (c0->getAlignmentSet()[i] == 0) {
-            //             return 0;
-            //         } else {
-            //             return 1;
-            //         }
-            //     }
-            // }
-            // return 0;
-            return c0->getAlignmentSet() < c1->getAlignmentSet();
-        }
-    } clique_comp_t;
-
-    typedef struct {
-        bool operator()(const Clique* c0,const Clique* c1) const {
-            return c0->getAlignmentSet() == c1->getAlignmentSet();
-        }
-    } clique_equal_t;
-
 public:
     CLEVER(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort);
     virtual ~CLEVER();
+
+    const AlignmentRecord & getAlignmentByIndex(size_t index) const {
+        assert(index<alignment_count);
+    	return *(alignments[index]);
+    }
+
     void addAlignment(std::auto_ptr<AlignmentRecord> ap);
 };
 
