@@ -10,7 +10,7 @@
 class BronKerbosch : public CliqueFinder {
 private:
     typedef std::pair<size_t, std::list<size_t>> adjacency_list_t;
-    typedef std::map<size_type, std::list<adjacency_list_t*>> degree_map_t;
+    typedef std::map<std::list<adjacency_list_t*>::size_type, std::list<adjacency_list_t*>> degree_map_t;
 
     std::vector<AlignmentRecord*> alignments_;
     std::list<size_t>* order_;
@@ -21,7 +21,7 @@ private:
 
     void degeneracy_order();
     void bronkerbosch(alignment_set_t R, alignment_set_t P, alignment_set_t X);
-    size_type pivot(alignment_set_t& P, alignment_set_t& X);
+    alignment_set_t::size_type find_pivot(const alignment_set_t& P, const alignment_set_t& X);
 public:
     BronKerbosch(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort);
     virtual ~BronKerbosch();

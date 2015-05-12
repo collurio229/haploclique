@@ -1,6 +1,8 @@
 #include "BronKerbosch.h"
+#include <boost/unordered_set.hpp>
+#include <boost/dynamic_bitset.hpp>
 
-using namespace boost;
+// using namespace boost;
 using namespace std;
 
 BronKerbosch::BronKerbosch(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort)
@@ -28,10 +30,10 @@ void BronKerbosch::finish() {
 
     bronkerbosch(alignment_set_t(alignment_count), alignment_set_t(alignment_count).flip(), alignment_set_t(alignment_count));
 
-    if (no_sort == 0) {
-		sort(cliques.begin(), cliques.end(), clique_comp_t());
-		// cliques.erase(std::unique(cliques.begin(), cliques.end(),clique_equal_t()), cliques.end());
-	}
+//    if (no_sort == 0) {
+//		sort(cliques->begin(), cliques->end(), clique_comp_t());
+//		cliques.erase(std::unique(cliques.begin(), cliques.end(),clique_equal_t()), cliques.end());
+//	}
 
     for (auto clique_it = cliques->begin();clique_it!=cliques->end(); ++clique_it) {
     	Clique* clique = *clique_it;
@@ -52,11 +54,11 @@ void BronKerbosch::degeneracy_order() {
         it->second.pop_front();
 
         for (auto&& index : list_vertex->second) {
-            size_type s = (*vertices_as_lists_)[index]->second.size();
+            list<adjacency_list_t*>::size_type s = (*vertices_as_lists_)[index]->second.size();
             adjacency_list_t* companion = (*vertices_as_lists_)[index];
 
-            vertices_[list_vertex->first].set(companion->first);
-            vertices_[companion->first].set(list_vertex->first);
+            (*vertices_)[list_vertex->first].set(companion->first);
+            (*vertices_)[companion->first].set(list_vertex->first);
 
             companion->second.remove(list_vertex->first);
 
@@ -79,13 +81,13 @@ void BronKerbosch::degeneracy_order() {
     delete vertices_as_lists_;
 }
 
-size_type BronKerbosch::pivot(alignment_set_t& P, alignment_set_t& X) {
-    unit = P | X;
-    size_type max_size = 0;
-    size_type index = alignment_set_t::npos;
+alignment_set_t::size_type BronKerbosch::find_pivot(const alignment_set_t& P, const alignment_set_t& X) {
+    alignment_set_t unit = P | X;
+    alignment_set_t::size_type max_size = 0;
+    alignment_set_t::size_type index = alignment_set_t::npos;
 
-    for(size_type i = unit.find_first(); i != alignment_set_t::npos; i = unit.find_next(i)) {
-        size_type new_size = (P & (*vertices_)[i]).count();        
+    for(auto i = unit.find_first(); i != alignment_set_t::npos; i = unit.find_next(i)) {
+        auto new_size = (P & (*vertices_)[i]).count();        
 
         if ( new_size > max_size ) {
             max_size = new_size;
@@ -100,13 +102,13 @@ size_type BronKerbosch::pivot(alignment_set_t& P, alignment_set_t& X) {
 
 void BronKerbosch::bronkerbosch(alignment_set_t R, alignment_set_t P, alignment_set_t X) {
     if (P.none() and X.none()) {
-        cliques->push_back(new Clique(*this, R));
+        cliques->push_back(new Clique(*this, auto_ptr<alignment_set_t>(new alignment_set_t(R) ) ) );
     }
 
-    size_type pivot = pivot(P, X);
-    comp = P - (*vertices_)[pivot];
+    alignment_set_t::size_type pivot = find_pivot(P, X);
+    alignment_set_t comp = P - (*vertices_)[pivot];
 
-    for (size_type i = comp.find_first(); i != alignment_set_t::npos; i = comp.find_next(i)) {
+    for (auto i = comp.find_first(); i != alignment_set_t::npos; i = comp.find_next(i)) {
         bronkerbosch(R.set(i), P & (*vertices_)[i], X & (*vertices_)[i]);
 
         P.reset(i);
@@ -114,7 +116,7 @@ void BronKerbosch::bronkerbosch(alignment_set_t R, alignment_set_t P, alignment_
     }
 }
 
-void BronKerbosch::addAlignment(std::auto_ptr<AlignmentRecord> ap) {
+void BronKerbosch::addAlignment(std::auto_ptr<AlignmentRecord> alignment_autoptr) {
 	assert(alignment_autoptr.get() != 0);
 	assert(cliques!=0);
 	alignment_id_t id = next_id++;
@@ -123,32 +125,32 @@ void BronKerbosch::addAlignment(std::auto_ptr<AlignmentRecord> ap) {
 	coverage_monitor.addAlignment(*alignment);
 
 	size_t index = alignment_count++;
-	alignments.push_back(alignment);
+	alignments_.push_back(alignment);
 
     adjacency_list_t* vertex = new adjacency_list_t(index, list<size_t>());
 
     vertices_as_lists_->push_back(vertex);
 
-    for (auto it = actives_->begin(); it != actives->end();) {
-        alignment2* = alignments[(*it)->first];
+    for (auto it = actives_->begin(); it != actives_->end();) {
+        AlignmentRecord* alignment2 = alignments_[(*it)->first];
 
         if (alignment->getIntervalStart() > alignment2->getIntervalEnd()) {
-            size_type ind = (*it)->second.size();
+            list<adjacency_list_t*>::size_type ind = (*it)->second.size();
 
             if(degree_map_->count(ind) == 0) {           
-                degree_map_->emplace(ind, list(1, *it) );
+                degree_map_->emplace(ind, list<adjacency_list_t*>(1, *it) );
             } else {
-                degree_map->at(ind).push_back(*it);
+                degree_map_->at(ind).push_back(*it);
             }
             
             it = actives_->erase(it);
             continue;
         }
 
-        if(edge_calculator.edgeBetween(alignment, alignment2) ) {
+        if(edge_calculator.edgeBetween(*alignment, *alignment2) ) {
 
-            if(second_edge_calculator != 0) {
-                if(not second_edge_calculator.edgeBetween(alignment, alignment2) ) {
+            if(second_edge_calculator != nullptr) {
+                if(not second_edge_calculator->edgeBetween(*alignment, *alignment2) ) {
                     continue;
                 }
             }

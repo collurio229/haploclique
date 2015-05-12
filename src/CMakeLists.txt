@@ -42,6 +42,7 @@ add_executable ( bam-to-alignment-priors
 add_executable (haploclique
 	haploclique.cpp
 	CLEVER.cpp
+    BronKerbosch.cpp
 	Clique.cpp
 	QuasispeciesEdgeCalculator.cpp
 	GaussianEdgeCalculator.cpp

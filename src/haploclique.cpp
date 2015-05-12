@@ -35,6 +35,7 @@
 #include "QuasispeciesEdgeCalculator.h"
 #include "CliqueFinder.h"
 #include "CLEVER.h"
+#include "BronKerbosch.h"
 #include "CliqueWriter.h"
 #include "CoverageMonitor.h"
 #include "HistogramBasedDistribution.h"
