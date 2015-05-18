@@ -251,7 +251,7 @@ public:
     CliqueWriter(std::ostream& os, VariationCaller* variation_caller, std::ostream* indel_os, const ReadGroups* read_groups, bool multisample, bool output_all, double fdr_threshold, bool verbose, int min_coverage, bool frameshift_merge, std::string suffix, int minimal_superread_length);
     virtual ~CliqueWriter();
     virtual void enableReadListOutput(std::ostream& os);
-    virtual void add(std::auto_ptr<Clique> clique);
+    virtual void add(std::unique_ptr<Clique> clique);
     virtual void finish();
 
     virtual long long getTotalCount() {

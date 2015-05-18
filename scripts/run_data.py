@@ -14,7 +14,7 @@ Usage:
 
 Options:
   -i <num>, --iterations <num>  number of haploclique iterations [default: 5]
-  --path                        Sets path variable to /haploclique/bin
+  --path <path>                 path to haploclique binaries [default: ../bin]
   --metric                      Compute match metric between quasispecies
                                 and haplotypes
 """
@@ -133,10 +133,8 @@ def main(argv):
         haplofiles.append(ref)
 
     # set the PATH variable to local haploclique binary
-    if args['--path']:
-        pathvar = os.environ['PATH']
-        os.environ['PATH'] = '/home/stud/lanber/usr/lib/jvm/java-7-openjdk-amd64/jre/bin:/home/stud/lanber/usr/bin:' + pathvar + ':' + os.path.realpath('../bin') + ':' + os.path.realpath('.')
-        os.environ['SAF'] = os.path.realpath('../bin')
+    pathvar = args['--path']
+    os.environ['SAF'] = os.path.realpath('../bin')
 
     progress('Creating bam index', False)
 
@@ -145,7 +143,7 @@ def main(argv):
 
     progress('Calling haploclique')
 
-    haploclique.main(['--iterations', str(args['--iterations']), path + '/' + ref, path + '/' + reads])
+    haploclique.main(['--iterations', str(args['--iterations']), '--cleanup', '--no-singletons', '--bin', pathvar, '--', path + '/' + ref, path + '/' + reads])
 
     done('Calling haploclique')
 
@@ -162,10 +160,6 @@ def main(argv):
         print('backward error:', compute_best_match_score(quasispecies, ref_sequences))
 
     remove_directory(path)
-
-    # clean PATH variable
-    if args['--path']:
-        os.environ['PATH'] = pathvar
 
     all_done()
 

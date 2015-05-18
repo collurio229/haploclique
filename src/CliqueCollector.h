@@ -23,7 +23,7 @@
 
 class CliqueCollector {
 public:
-	virtual void add(std::auto_ptr<Clique> clique) = 0;
+	virtual void add(std::unique_ptr<Clique> clique) = 0;
 };
 
 #endif /* CLIQUECOLLECTOR_H_ */

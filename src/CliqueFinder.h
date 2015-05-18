@@ -51,7 +51,7 @@ public:
         
     }
 
-    virtual void addAlignment(std::auto_ptr<AlignmentRecord> ap) = 0;
+    virtual void addAlignment(std::unique_ptr<AlignmentRecord>& ap) = 0;
 
     virtual void finish() {
         if (edge_writer != 0) {
@@ -60,7 +60,7 @@ public:
 	    clique_list_t::iterator clique_it = cliques->begin();
 	    for (;clique_it!=cliques->end(); ++clique_it) {
 	    	Clique* clique = *clique_it;
-	    	clique_collector.add(auto_ptr<Clique>(clique));
+	    	clique_collector.add(unique_ptr<Clique>(clique));
 	    }
 	    delete cliques;
 	    cliques = 0;

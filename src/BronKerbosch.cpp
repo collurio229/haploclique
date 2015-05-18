@@ -28,8 +28,18 @@ BronKerbosch::~BronKerbosch() {
 void BronKerbosch::finish() {
     degeneracy_order();
 
-    bronkerbosch(alignment_set_t(alignment_count), alignment_set_t(alignment_count).flip(), alignment_set_t(alignment_count));
+    alignment_set_t R(alignment_count);
+    alignment_set_t P(alignment_count);
+    P.flip();
+    alignment_set_t X(alignment_count);
 
+    for (auto&& i : *order_) {
+        bronkerbosch(R.set(i), P & (*vertices_)[i], X & (*vertices_)[i]);
+
+        P.reset(i);
+        X.set(i);
+
+    }
 //    if (no_sort == 0) {
 //		sort(cliques->begin(), cliques->end(), clique_comp_t());
 //		cliques.erase(std::unique(cliques.begin(), cliques.end(),clique_equal_t()), cliques.end());
@@ -37,7 +47,7 @@ void BronKerbosch::finish() {
 
     for (auto clique_it = cliques->begin();clique_it!=cliques->end(); ++clique_it) {
     	Clique* clique = *clique_it;
-        clique_collector.add(auto_ptr<Clique>(clique));
+        clique_collector.add(unique_ptr<Clique>(clique));
    }
 	    delete cliques;
 	    cliques = nullptr;
@@ -102,7 +112,8 @@ alignment_set_t::size_type BronKerbosch::find_pivot(const alignment_set_t& P, co
 
 void BronKerbosch::bronkerbosch(alignment_set_t R, alignment_set_t P, alignment_set_t X) {
     if (P.none() and X.none()) {
-        cliques->push_back(new Clique(*this, auto_ptr<alignment_set_t>(new alignment_set_t(R) ) ) );
+        unique_ptr<alignment_set_t> ptr(new alignment_set_t(R) );
+        cliques->push_back(new Clique(*this,  ptr) );
     }
 
     alignment_set_t::size_type pivot = find_pivot(P, X);
@@ -116,7 +127,7 @@ void BronKerbosch::bronkerbosch(alignment_set_t R, alignment_set_t P, alignment_
     }
 }
 
-void BronKerbosch::addAlignment(std::auto_ptr<AlignmentRecord> alignment_autoptr) {
+void BronKerbosch::addAlignment(std::unique_ptr<AlignmentRecord>& alignment_autoptr) {
 	assert(alignment_autoptr.get() != 0);
 	assert(cliques!=0);
 	alignment_id_t id = next_id++;

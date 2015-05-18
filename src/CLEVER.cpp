@@ -98,9 +98,10 @@ void CLEVER::reorganize_storage() {
 	capacity = new_capacity;
 }
 
-void CLEVER::addAlignment(std::auto_ptr<AlignmentRecord> alignment_autoptr) {
-	assert(alignment_autoptr.get() != 0);
+void CLEVER::addAlignment(std::unique_ptr<AlignmentRecord>& alignment_autoptr) {
+    assert(alignment_autoptr.get() != 0);
 	assert(cliques!=0);
+
 	alignment_id_t id = next_id++;
 	AlignmentRecord* alignment = alignment_autoptr.release();
 	alignment->setID(id);
@@ -112,6 +113,7 @@ void CLEVER::addAlignment(std::auto_ptr<AlignmentRecord> alignment_autoptr) {
 	}
 	size_t index = alignment_count++;
 	alignments[index] = alignment;
+
 	// TODO: Once edge criteria are fixed, we can try to (re-)gain some efficiency here...
 // 	if (single_end) {
 		alignments_by_length.insert(make_pair(0, index));
@@ -153,11 +155,11 @@ void CLEVER::addAlignment(std::auto_ptr<AlignmentRecord> alignment_autoptr) {
 		Clique* clique = *clique_it;
 		if (clique->rightmostSegmentEnd() < alignment->getIntervalStart()) {
 			clique_it = cliques->erase(clique_it);
-			clique_collector.add(auto_ptr<Clique>(clique));
+			clique_collector.add(unique_ptr<Clique>(clique));
 		} else {
 			// is there an intersection between nodes adjacent to the new
 			// alignment and the currently considered clique?
-			auto_ptr<alignment_set_t> intersection = clique->intersect(adjacent);
+			unique_ptr<alignment_set_t> intersection = clique->intersect(adjacent);
 			if (intersection->any()) {
 				// is node adjacent to all nodes in the clique?
 				if (intersection->count() == clique->size()) {

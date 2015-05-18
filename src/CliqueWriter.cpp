@@ -750,10 +750,10 @@ int CliqueWriter::shortenBase(char base) {
   }
 }
 
-void CliqueWriter::add(std::auto_ptr<Clique> clique) {
+void CliqueWriter::add(std::unique_ptr<Clique> clique) {
   assert(!finished);
   clique_stats_t stats;
-  auto_ptr<vector<const AlignmentRecord*> > all_pairs = clique->getAllAlignments();
+  unique_ptr<vector<const AlignmentRecord*> > all_pairs = clique->getAllAlignments();
   assert(all_pairs->size() == clique->size());
 
   callVariation(*all_pairs, clique->totalCenterCoverage(), stats);
@@ -774,7 +774,7 @@ void CliqueWriter::add(std::auto_ptr<Clique> clique) {
   // information
   if ((read_list_os != 0) && passed_fdr) {
     // retrieve all alignments associated the current clique
-    auto_ptr<vector<const AlignmentRecord*> > alignments = clique->getAllAlignments();
+    unique_ptr<vector<const AlignmentRecord*> > alignments = clique->getAllAlignments();
     stats.reads = new vector<alignment_id_t>();
     for (size_t i = 0; i < alignments->size(); ++i) {
       const AlignmentRecord& ap = *alignments->at(i);
@@ -881,7 +881,7 @@ void CliqueWriter::writeReadlist() {
 }
 
 void CliqueWriter::printout(int pos_1) {
-  // //cerr << "PRINT: " << pos_1 << endl;
+  // cerr << "PRINT: " << pos_1 << endl;
   if (fastq_map.empty()) {
     return;
   }
@@ -890,6 +890,7 @@ void CliqueWriter::printout(int pos_1) {
   } else {
     this->output_position=pos_1;
   }
+
   ofstream fr1;
   fr1.open ("data_cliques_paired_R1.fastq", ios::out | ios::app);
   ofstream fr2;

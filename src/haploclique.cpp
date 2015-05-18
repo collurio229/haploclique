@@ -55,98 +55,39 @@ using namespace boost;
 static const char USAGE[] =
 R"(haploclique predicts haplotypes from NGS reads.
 
-Usage: haploclique (--clever | --bronkerbosch) [options]
+Usage:
+  haploclique [clever] [options]
+  haploclique bronkerbosch [options]
 
-Reads alignments / alignment pairs from stdin and computes all cliques.
-Format for single-end reads:
-<read-name> <read-nr> <read-group> <phred-sum> <chromosome> <start> <end> <strand> <cigar> <seq> <qualities> <aln-prob>
-Format for paired-end reads:
-<read-name> <pair-nr> <read-group> <phred-sum1> <chromosome1> <start1> <end1> <strand1> <cigar1> <seq1> <qualities1> <phred-sum2> <chromosome2> <start2> <end2> <strand2> <cigar2> <seq2> <qualities2> <aln-pair-prob> <aln-pair-prob-inslength>
+  clever        use the original clever clique finder
+  bronkerbosch  use the Bron-Kerbosch based clique finder
 
-NOTE: Lines are assumed to be ordered by field 6 (start1).
-
---clever            Use the original CLEVER algorithm for enumerating maximal
-                    cliques.
---bronkerbosch      Use the Bron-Kerbosch algorithm for enumerationg maximal
-                    cliques.
-
-<distribution-file> file with assumed internal segment length distribution.
-                    in default mode, this is a file containing one line with
-                    mean and standard deviation of the normal distribution
-                    to be used. Such a file can be generated using option -m
-                    of insert-length-histogram. Note that the
-                    "internal segment" does NOT include the read (ends), i.e.
-                    a fragment disjointly consists of two reads (read ends)
-                    and an internal segment.
-
-Options:
-  -v --verbose                Be verbose: output additional statistics for
-                              each variation.
-  -w --min_aln_weight NUM     Minimum weight of alignment pairs to be
-                              considered. [default: 0.0016]
-  -l --max_insert_length NUM  Maximum insert length of alignments to be
-                              considered (0=unlimited). [default: 50000]
-  -c --max_coverage NUM       Maximum allowed coverage. If exceeded,
-                              violating reads are ignored. The number of such
-                              ignored reads is printed to stderr
-                              (0=unlimited). [default: 200]
-  -e --write_edges FILE       Write edges to file of given name.
-  -f --fdr NUM                False discovery rate (FDR). [default: 0.1]
-  -a --all                    Output all cliques instead of only the
-                              significant ones. Cliques are not sorted and
-                              last column (FDR) is not computed.
-  -r --output_reads FILE      Output reads belonging to at least one
-                              significant clique to the given filename (along
-                              with their assignment to significant cliques).
-  -C --output_coverage FILE   Output the coverage with considered insert
-                              segments along the chromosome (one line per
-                              position) to the given filename.
-  -q --edge_quasi_cutoff_cliques NUM  End compatibility probability cutoff
-                                      between error-corrected reads for
-                                      quasispecies reconstruction.
-                                      [default: 0.99]
-  -k --edge_quasi_cutoff_mixed NUM    End compatibility probability cutoff
-                                      between raw<->error-corrected reads for
-                                      quasispecies reconstruction.
-                                      [default: 0.97]
-  -g --edge_quasi_cutoff_single NUM   End compatibility probability cutoff
-                                      between raw<->raw reads for
-                                      quasispecies reconstruction.
-                                      [default:0.95]
-  -Q --random_overlap_quality NUM     Probability that two random reads are
-                                      equal at the same position.
-                                      [default: 0.9]
-  -m --frame_shift_merge              Reads will be clustered if one has
-                                      single nucleotide deletions and
-                                      insertions. Use for PacBio data sets.
-  -o --min_overlap_cliques NUM        Minimum relative overlap between
-                                      error-corrected reads. [default: 0.9]
-  -j --min_overlap_single NUM         Minimum relative overlap between
-                                      raw<->raw and raw<->error-corrected
-                                      reads. [default: 0.6]
-  -s --super_read_min_coverage NUM    Minimum coverage for super-read
-                                      assembly. [default: 2]
-  -A --allel_frequencies FILE         ???
-  -I --call_indels FILE               Call indels from cliques. In this mode,
-                                      the classical "CLEVER" edge criterion
-                                      is used in addition to the new one.
-                                      Filename to write indels to must be
-                                      given as parameter.
-  -M --mean_and_sd_filename FILE      Name of file with mean and standard
-                                      deviation of insert size distribution
-                                      (only required if option -I is used).
-  -p --indel_edge_sig_level NUM       Significance level for "indel" edges
-                                      criterion, see option -I (the lower the
-                                      level, the more edges will be present).
-                                      [default: 0.2]
-  -t --time_limit NUM         Time limit for computation. If
-                              exceeded, non processed reads will be
-                              written to skipped.
-  -N --no_sort                Do not sort new clique w.r.t. their bitsets.
-  -S --suffix                 Suffix for clique names. Used for
-                              parallelization.
-  -L --minimal_super_read_length NUM
-                              Minimal super read length. [default: 0]  
+options:
+  -v --verbose
+  -w <num> --min_aln_weight <num>              [default: 0.0016]
+  -l <num> --max_insert_length <num>           [default: 50000]
+  -c <num> --max_coverage <num>                [default: 200]
+  -e <file> --write_edges <file>
+  -f <num> --fdr <num>                         [default: 0.1]
+  -a --all
+  -r <file> --output_reads <file>
+  -C <file> --output_coverage <file>
+  -q <num> --edge_quasi_cutoff_cliques <num>   [default: 0.99]
+  -k <num> --edge_quasi_cutoff_mixed <num>     [default: 0.97]
+  -g <num> --edge_quasi_cutoff_single <num>    [default: 0.95]
+  -Q <num> --random_overlap_quality <num>      [default: 0.9]
+  -m --frame_shift_merge
+  -o <num> --min_overlap_cliques <num>         [default: 0.9]
+  -j <num> --min_overlap_single <num>          [default: 0.6]
+  -s <num> --super_read_min_coverage <num>     [default: 2]
+  -A <file> --allel_frequencies <file>
+  -I <file> --call_indels <file>
+  -M <file> --mean_and_sd_filename <file>
+  -p <num> --indel_edge_sig_level <num>        [default: 0.2]
+  -t <num> --time_limit <num>                  [default: 10]
+  -N --no_sort
+  -S <sfx> --suffix <sfx>
+  -L <num> --minimal_super_read_length <num>   [default: 0]
 )";
 
 void usage() {
@@ -181,11 +122,16 @@ int main(int argc, char* argv[]) {
     map<std::string, docopt::value> args
         = docopt::docopt(USAGE,
                          { argv + 1, argv + argc },
-                         true);
+                         false);
+
+//    for (auto const& arg: args) {
+//        std::cout << arg.first << ": " << arg.second << std::endl;
+//    }
+
     // PARAMETERS
     double min_aln_weight = stod(args["--min_aln_weight"].asString());
     double max_insert_length = stod(args["--max_insert_length"].asString());
-    long max_coverage = args["--max_coverage"].asLong();
+    int max_coverage = stoi(args["--max_coverage"].asString());
     string edge_filename = "";
     if (args["--write_edges"]) edge_filename = args["--write_edges"].asString();
     double fdr = stod(args["--fdr"].asString());
@@ -201,7 +147,7 @@ int main(int argc, char* argv[]) {
     double overlap_cliques = stod(args["--min_overlap_cliques"].asString());
     double overlap_single = stod(args["--min_overlap_single"].asString());
     bool frameshift_merge = args["--frame_shift_merge"].asBool();
-    long super_read_min_coverage = args["--super_read_min_coverage"].asLong();
+    int super_read_min_coverage = stoi(args["--super_read_min_coverage"].asString());
     string allel_frequencies_path = "";
     if (args["--allel_frequencies"]) allel_frequencies_path = args["--allel_frequencies"].asString();
     string mean_and_sd_filename = "";
@@ -210,11 +156,11 @@ int main(int argc, char* argv[]) {
     double indel_edge_sig_level = stod(args["--indel_edge_sig_level"].asString());
     string indel_output_file = "";
     if (args["--call_indels"]) indel_output_file = args["--call_indels"].asString();
-    long time_limit = args["--time_limit"].asLong();
+    int time_limit = stoi(args["--time_limit"].asString());
     bool no_sort = args["--no_sort"].asBool();
     string suffix = "";
     if (args["--suffix"]) suffix = args["--suffix"].asString();
-    long minimal_superread_length = args["--minimal_superread_length"].asLong();
+    int minimal_superread_length = stoi(args["--minimal_super_read_length"].asString());
     // END PARAMETERS
 
     if (isatty(fileno(stdin))) {
@@ -273,7 +219,7 @@ int main(int argc, char* argv[]) {
     ReadSetSignificanceTester* significance_tester = 0;
     VariationCaller* variation_caller = 0;
     ReadGroups* read_groups = 0;
-    auto_ptr<vector<mean_and_stddev_t> > readgroup_params(0);
+    unique_ptr<vector<mean_and_stddev_t> > readgroup_params(nullptr);
     edge_calculator = new QuasispeciesEdgeCalculator(Q, edge_quasi_cutoff_cliques, overlap_cliques, frameshift_merge, simpson_map, edge_quasi_cutoff_single, overlap_single, edge_quasi_cutoff_mixed);
     if (call_indels) {
         double insert_mean = -1.0;
@@ -292,7 +238,12 @@ int main(int argc, char* argv[]) {
         indel_os = new ofstream(indel_output_file.c_str());
     }
     CliqueWriter clique_writer(cout, variation_caller, indel_os, read_groups, false, output_all, fdr, verbose, super_read_min_coverage, frameshift_merge, suffix, minimal_superread_length);
-    CliqueFinder* clique_finder = new CLEVER(*edge_calculator, clique_writer, read_groups, no_sort);
+    CliqueFinder* clique_finder;
+    if (args["bronkerbosch"].asBool()) {
+        clique_finder = new BronKerbosch(*edge_calculator, clique_writer, read_groups, no_sort);
+    } else {
+        clique_finder = new CLEVER(*edge_calculator, clique_writer, read_groups, no_sort);
+    }
     if (indel_edge_calculator != 0) {
         clique_finder->setSecondEdgeCalculator(indel_edge_calculator);
     }
@@ -334,7 +285,7 @@ int main(int argc, char* argv[]) {
             }
             valid_alignments += 1;
             last_pos = ap.getIntervalStart();
-            auto_ptr<AlignmentRecord> alignment_autoptr(new AlignmentRecord(ap));
+            unique_ptr<AlignmentRecord> alignment_autoptr(new AlignmentRecord(ap));
             if (ap.isPairedEnd() && (max_insert_length > 0)) {
                 if (alignment_autoptr->getInsertLength() > max_insert_length) {
                 //skipped_by_length += 1;
@@ -371,15 +322,15 @@ int main(int argc, char* argv[]) {
         indel_os->close();
         delete indel_os;
     }
-    if (edge_calculator != 0) delete edge_calculator;
-    if (variation_caller != 0) delete variation_caller;
-    if (significance_tester != 0) delete significance_tester;
+    if (edge_calculator != nullptr) delete edge_calculator;
+    if (variation_caller != nullptr) delete variation_caller;
+    if (significance_tester != nullptr) delete significance_tester;
     if (edge_writer != 0) {
         delete edge_writer;
         delete edge_ofstream;
     }
-    if (clique_finder != 0) delete clique_finder;
-    if (reads_ofstream != 0) {
+    if (clique_finder != nullptr) delete clique_finder;
+    if (reads_ofstream != nullptr) {
         delete reads_ofstream;
     }
     double cpu_time = (double) (clock() - clock_start) / CLOCKS_PER_SEC;

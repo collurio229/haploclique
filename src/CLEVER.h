@@ -46,7 +46,7 @@ public:
     	return *(alignments[index]);
     }
 
-    void addAlignment(std::auto_ptr<AlignmentRecord> ap);
+    void addAlignment(std::unique_ptr<AlignmentRecord>& ap);
 };
 
 #endif /* CLEVER_H_ */
