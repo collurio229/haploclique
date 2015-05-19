@@ -34,8 +34,10 @@ void BronKerbosch::finish() {
     alignment_set_t X(alignment_count);
 
     for (auto&& i : *order_) {
+
         bronkerbosch(R.set(i), P & (*vertices_)[i], X & (*vertices_)[i]);
 
+        R.reset(i);
         P.reset(i);
         X.set(i);
 
@@ -54,31 +56,53 @@ void BronKerbosch::finish() {
 }
 
 void BronKerbosch::degeneracy_order() {
+
+    // Move all still active vertices into the degree map
+    for (auto it = actives_->begin(); it != actives_->end();) {
+        list<adjacency_list_t*>::size_type ind = (*it)->second.size();
+
+        if(degree_map_->count(ind) == 0) {           
+            degree_map_->emplace(ind, list<adjacency_list_t*>(1, *it) );
+        } else {
+            degree_map_->at(ind).push_back(*it);
+        }
+        
+        it = actives_->erase(it);
+    }
+
+    // Delete isolated vertices
+    degree_map_->erase(0);
+
     order_ = new list<size_t>();
     vertices_ = new vector<alignment_set_t>(alignment_count, alignment_set_t(alignment_count));
 
     while (not degree_map_->empty()) {
         auto it = degree_map_->begin();
+
+        if (it->second.empty()) {
+            degree_map_->erase(it);
+            continue;
+        }
         
         adjacency_list_t* list_vertex = it->second.front();
         it->second.pop_front();
 
+        // Update degree map
         for (auto&& index : list_vertex->second) {
-            list<adjacency_list_t*>::size_type s = (*vertices_as_lists_)[index]->second.size();
             adjacency_list_t* companion = (*vertices_as_lists_)[index];
+            list<adjacency_list_t*>::size_type s = companion->second.size();
 
             (*vertices_)[list_vertex->first].set(companion->first);
             (*vertices_)[companion->first].set(list_vertex->first);
 
             companion->second.remove(list_vertex->first);
 
-            degree_map_->at(s-1).push_back(companion);
-            for (auto iterator = degree_map_->at(s).begin(); iterator != degree_map_->at(s).end();) {
-                if( (*iterator)->first == companion->first) {
-                    degree_map_->at(s).erase(iterator);
-                    break;
-                }
-                iterator++;
+            degree_map_->at(s).remove(companion);
+
+            if (degree_map_->count(s-1) == 0) {
+                degree_map_->emplace(s-1, list<adjacency_list_t*>(1, companion) );                
+            } else {
+                degree_map_->at(s-1).push_front(companion);
             }
         }
         order_->push_back(list_vertex->first);
@@ -94,9 +118,9 @@ void BronKerbosch::degeneracy_order() {
 alignment_set_t::size_type BronKerbosch::find_pivot(const alignment_set_t& P, const alignment_set_t& X) {
     alignment_set_t unit = P | X;
     alignment_set_t::size_type max_size = 0;
-    alignment_set_t::size_type index = alignment_set_t::npos;
+    alignment_set_t::size_type index = unit.find_first();
 
-    for(auto i = unit.find_first(); i != alignment_set_t::npos; i = unit.find_next(i)) {
+    for(auto i = unit.find_next(index); i != alignment_set_t::npos; i = unit.find_next(i)) {
         auto new_size = (P & (*vertices_)[i]).count();        
 
         if ( new_size > max_size ) {
@@ -114,6 +138,7 @@ void BronKerbosch::bronkerbosch(alignment_set_t R, alignment_set_t P, alignment_
     if (P.none() and X.none()) {
         unique_ptr<alignment_set_t> ptr(new alignment_set_t(R) );
         cliques->push_back(new Clique(*this,  ptr) );
+        return;
     }
 
     alignment_set_t::size_type pivot = find_pivot(P, X);
@@ -122,6 +147,7 @@ void BronKerbosch::bronkerbosch(alignment_set_t R, alignment_set_t P, alignment_
     for (auto i = comp.find_first(); i != alignment_set_t::npos; i = comp.find_next(i)) {
         bronkerbosch(R.set(i), P & (*vertices_)[i], X & (*vertices_)[i]);
 
+        R.reset(i);
         P.reset(i);
         X.set(i);
     }
@@ -169,8 +195,14 @@ void BronKerbosch::addAlignment(std::unique_ptr<AlignmentRecord>& alignment_auto
             // Draw edge between current alignment and old alignment in vert
             get<1>(*vertex).push_back((*it)->first);
             get<1>(**it).push_back(vertex->first);
+
+   			if (edge_writer != 0) {
+				edge_writer->addEdge(*alignment, *alignment2);
+			}
         }
         it++;
     }
+
+    actives_->push_back(vertex);
 
 }

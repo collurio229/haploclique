@@ -202,14 +202,14 @@ void CLEVER::addAlignment(std::unique_ptr<AlignmentRecord>& alignment_autoptr) {
 				if (clique_j->contains(*clique_i)) {
 					// cout << "Removing duplicate or non-maximal clique!" << endl;
 					delete clique_i;
-					new_cliques[i] = 0;
+					new_cliques[i] = nullptr;
 					break;
 				}
 			} else {
 				if (clique_i->contains(*clique_j)) {
 					// cout << "Removing duplicate or non-maximal clique!" << endl;
 					delete clique_j;
-					new_cliques[j] = 0;
+					new_cliques[j] = nullptr;
 					continue;
 				}
 			}
@@ -218,7 +218,7 @@ void CLEVER::addAlignment(std::unique_ptr<AlignmentRecord>& alignment_autoptr) {
 	//double cpu_time = (double) (clock() - clock_start) / CLOCKS_PER_SEC;
 	//int clique_size_new = 0;
 	for (size_t i=0; i<new_cliques.size(); ++i) {
-		if (new_cliques[i]!=0) {
+		if (new_cliques[i]!=nullptr) {
 			cliques->push_back(new_cliques[i]);
 			//clique_size_new++;
 		}
