@@ -905,6 +905,10 @@ void CliqueWriter::printout(int pos_1) {
     fastq_entry f;
     f = it->second;
     if (f.pos_1+100 < pos_1 || pos_1 == -1) {
+      if (f.seq_1.empty()) {
+         ++it;
+         continue;
+      }
       if ((f.read_names->size() + f.hcount) >= this->min_coverage) {
         ofstream* out1;
         if (f.seq_2.empty()) {

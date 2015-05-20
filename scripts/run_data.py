@@ -14,9 +14,10 @@ Usage:
 
 Options:
   -i <num>, --iterations <num>  number of haploclique iterations [default: 5]
-  --path <path>                 path to haploclique binaries [default: ../bin]
-  --metric                      Compute match metric between quasispecies
+  -p <path>, --path <path>      path to haploclique binaries [default: ../bin]
+  -m --metric                   Compute match metric between quasispecies
                                 and haplotypes
+  -b --bronkerbosch             Use Bron-Kerbosch algorithm
 """
 
 from subprocess import call
@@ -143,7 +144,12 @@ def main(argv):
 
     progress('Calling haploclique')
 
-    haploclique.main(['--iterations', str(args['--iterations']), '--cleanup', '--no-singletons', '--bin', pathvar, '--', path + '/' + ref, path + '/' + reads])
+    algorithm = 'clever'
+
+    if args['--bronkerbosch']:
+        algorithm = 'bronkerbosch'
+
+    haploclique.main([algorithm, '--iterations', str(args['--iterations']), '--cleanup', '--no-singletons', '--bin', pathvar, '--', path + '/' + ref, path + '/' + reads])
 
     done('Calling haploclique')
 

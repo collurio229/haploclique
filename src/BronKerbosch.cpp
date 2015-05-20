@@ -42,10 +42,6 @@ void BronKerbosch::finish() {
         X.set(i);
 
     }
-//    if (no_sort == 0) {
-//		sort(cliques->begin(), cliques->end(), clique_comp_t());
-//		cliques.erase(std::unique(cliques.begin(), cliques.end(),clique_equal_t()), cliques.end());
-//	}
 
     for (auto clique_it = cliques->begin();clique_it!=cliques->end(); ++clique_it) {
     	Clique* clique = *clique_it;
