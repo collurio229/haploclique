@@ -21,13 +21,19 @@
 using namespace std;
 
 EdgeWriter::EdgeWriter(std::ostream& os) : os(os), vertex_to_read_names() {
-	finished = false;
+	finished = true;
 }
 
 EdgeWriter::~EdgeWriter() {
 	finish();
 }
 
+void EdgeWriter::initialize() {
+    nodes.clear();
+    vertex_to_read_names.clear();
+
+    finished = false;
+}
 
 void EdgeWriter::addEdge(const AlignmentRecord& node1, const AlignmentRecord& node2) {
 	assert(!finished);

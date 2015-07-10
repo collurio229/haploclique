@@ -32,13 +32,10 @@ class CLEVER : public CliqueFinder {
 private:
     size_t capacity;
     AlignmentRecord **alignments;
-    vector<alignment_set_t> vertices_; //DEBUG
 
     typedef std::pair<unsigned int,size_t> length_and_index_t;
     std::set<length_and_index_t> alignments_by_length;
     void reorganize_storage();
-    void printSet(std::ostream& os, alignment_set_t set);
-    bool cliquesistent(alignment_set_t set);
 public:
     CLEVER(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort);
     virtual ~CLEVER();

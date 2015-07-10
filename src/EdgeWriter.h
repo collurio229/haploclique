@@ -47,6 +47,8 @@ public:
 
 	/** Output all nodes and edges that are still unfinished. */
 	virtual void finish();
+
+    virtual void initialize();
 };
 
 #endif /* EDGEWRITER_H_ */

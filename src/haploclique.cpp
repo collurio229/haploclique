@@ -301,12 +301,12 @@ int main(int argc, char* argv[]) {
 
     delete reads;
 
-    if (indel_os != 0) {
+    if (indel_os != nullptr) {
         indel_os->close();
         delete indel_os;
     }
     if (edge_calculator != nullptr) delete edge_calculator;
-    if (edge_writer != 0) {
+    if (edge_writer != nullptr) {
         delete edge_writer;
         delete edge_ofstream;
     }

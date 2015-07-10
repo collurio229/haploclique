@@ -44,6 +44,9 @@ void BronKerbosch::initialize() {
 
   	alignment_count = 0;
     next_id = 0;
+
+    if (edge_writer != nullptr) edge_writer->initialize();
+
     initialized = true;
     converged = true;
 }
@@ -51,42 +54,23 @@ void BronKerbosch::initialize() {
 void BronKerbosch::finish() {
     assert(initialized);
 
-    if (converged) {
-        for (unsigned int i = 0; i < alignments_.size(); i++) {
-            unique_ptr<alignment_set_t> ptr(new alignment_set_t(alignment_count));
-            ptr->set(i);
-            cliques->push_back(new Clique(*this,  ptr));
-        }
-    } else {
+    degeneracy_order();
 
-        degeneracy_order();
+    alignment_set_t R(alignment_count);
+    alignment_set_t P(alignment_count);
+    P.flip();
+    alignment_set_t X(alignment_count);
 
-//    printEdges("bk_edges_intern.txt");
+    for (auto&& i : *order_) {
 
-        alignment_set_t R(alignment_count);
-        alignment_set_t P(alignment_count);
-        P.flip();
-        alignment_set_t X(alignment_count);
+        bronkerbosch(R.set(i), P & (*vertices_)[i], X & (*vertices_)[i]);
 
-        for (auto&& i : *order_) {
-
-            bronkerbosch(R.set(i), P & (*vertices_)[i], X & (*vertices_)[i]);
-
-            R.reset(i);
-            P.reset(i);
-            X.set(i);
-
-        }
+        R.reset(i);
+        P.reset(i);
+        X.set(i);
     }
-//    ofstream clique_file("bk_cliques_intern.tsv", ofstream::out);
-//    unsigned int ct = 0;
 
     for (auto&& clique : *cliques) {
-
-//        clique_file << "Clique_" << ct << "\t";
-//        printReads(clique_file, clique->getAlignmentSet());
-//        ct++;
-
         clique_collector.add(unique_ptr<Clique>(clique));
     }
     delete cliques;
@@ -108,9 +92,6 @@ void BronKerbosch::degeneracy_order() {
         
         it = actives_->erase(it);
     }
-
-    // Delete isolated vertices
-    degree_map_->erase(0);
 
     order_ = new list<size_t>();
     vertices_ = new vector<alignment_set_t>(alignment_count, alignment_set_t(alignment_count));

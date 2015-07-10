@@ -43,9 +43,13 @@ void CLEVER::initialize() {
     cliques = new clique_list_t();
     alignments = new AlignmentRecord*[capacity];
 
+    capacity = alignment_set_t::bits_per_block;
   	alignment_count = 0;
     next_id = 0;
     alignments_by_length.clear();
+
+    if (edge_writer != nullptr) edge_writer->initialize();
+
     converged = true;
     initialized = true;
 }
@@ -126,47 +130,6 @@ void CLEVER::reorganize_storage() {
 	capacity = new_capacity;
 }
 
-void CLEVER::printSet(std::ostream& os, alignment_set_t set) {
-    for (auto j = set.find_first(); j != alignment_set_t::npos; j = set.find_next(j)) {
-        os << " " << j;
-    }
-    os << endl;
-}
-
-bool CLEVER::cliquesistent(alignment_set_t clique) {
-    auto i = clique.find_first();
-    alignment_set_t intersect(vertices_[i]);
-    intersect.set(i);
-
-    for (i=clique.find_next(i); i != alignment_set_t::npos; i = clique.find_next(i)) {
-        alignment_set_t tmp(vertices_[i]);
-        tmp.set(i);
-
-        intersect &= tmp;
-    }
-    if (not clique.is_subset_of(intersect)) {
-        cout << "clique - intersect:";
-        printSet(cerr, clique - intersect);
-        cout << "vertices in clique:" << endl;
-        for (auto i=clique.find_first(); i != alignment_set_t::npos; i = clique.find_next(i)) {
-            cerr << i << ":";
-            printSet(cout, vertices_[i]);
-        }
-        return false;
-    }
-    if (not intersect.is_subset_of(clique)) {
-        cout << "intersect - clique:";
-        printSet(cout, intersect - clique);
-        cout << "vertices in clique:" << endl;
-        for (auto i=clique.find_first(); i != alignment_set_t::npos; i = clique.find_next(i)) {
-            cout << i << ":";
-            printSet(cout, vertices_[i]);
-        }
-        return false;
-    }
-    return true;
-}
-
 void CLEVER::addAlignment(std::unique_ptr<AlignmentRecord>& alignment_autoptr) {
     assert(alignment_autoptr.get() != 0);
 	assert(cliques!=0);
@@ -217,7 +180,6 @@ void CLEVER::addAlignment(std::unique_ptr<AlignmentRecord>& alignment_autoptr) {
 	}
 
     alignments_by_length.insert(make_pair(0, index));
-    vertices_.push_back(alignment_set_t(adjacent)); //DEBUG
 
 	// iterate over all active cliques. output those that lie left of current segment and
 	// check intersection with current node for the rest
@@ -231,7 +193,6 @@ void CLEVER::addAlignment(std::unique_ptr<AlignmentRecord>& alignment_autoptr) {
 		Clique* clique = *clique_it;
 		if (clique->rightmostSegmentEnd() < alignment->getIntervalStart()) {
 			clique_it = cliques->erase(clique_it);
-            //assert(cliquesistent(clique->getAlignmentSet())); //DEBUG
 			clique_collector.add(unique_ptr<Clique>(clique));
 		} else {
 			// is there an intersection between nodes adjacent to the new
