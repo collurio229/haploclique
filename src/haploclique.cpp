@@ -67,24 +67,36 @@ Usage:
   bronkerbosch  use the Bron-Kerbosch based clique finder
 
 options:
-  -e <file> --write_edges <file>
-  -a --all
-  -r <file> --output_reads <file>
-  -C <file> --output_coverage <file>
-  -q <num> --edge_quasi_cutoff_cliques <num>   [default: 0.99]
-  -k <num> --edge_quasi_cutoff_mixed <num>     [default: 0.97]
-  -g <num> --edge_quasi_cutoff_single <num>    [default: 0.95]
-  -Q <num> --random_overlap_quality <num>      [default: 0.9]
-  -m --frame_shift_merge
-  -o <num> --min_overlap_cliques <num>         [default: 0.9]
-  -j <num> --min_overlap_single <num>          [default: 0.6]
+  -e <file> --write_edges <file>              Write graph edges to file
+  -q <num> --edge_quasi_cutoff_cliques <num>  edge calculator option
+                                              [default: 0.99]
+  -k <num> --edge_quasi_cutoff_mixed <num>    edge calculator option
+                                              [default: 0.97]
+  -g <num> --edge_quasi_cutoff_single <num>   edge calculator option
+                                              [default: 0.95]
+  -Q <num> --random_overlap_quality <num>     edge calculator option
+                                              [default: 0.9]
+  -m --frame_shift_merge                      Reads will be clustered with 
+                                              single nucleotide insertions or
+                                              deletions. Use for PacBio data.
+  -o <num> --min_overlap_cliques <num>        edge calculator option
+                                              [default: 0.9]
+  -j <num> --min_overlap_single <num>         edge calculator option
+                                              [default: 0.6]
   -A <file> --allel_frequencies <file>
-  -I <file> --call_indels <file>
-  -M <file> --mean_and_sd_filename <file>
-  -p <num> --indel_edge_sig_level <num>        [default: 0.2]
-  -N --no_sort
-  -S <sfx> --suffix <sfx>
-  -i <num> --iterations <num>                  [default: -1]
+  -I <file> --call_indels <file>              variant calling is not supported
+                                              yet.
+  -M <file> --mean_and_sd_filename <file>     Required for option -I
+  -p <num> --indel_edge_sig_level <num>       [default: 0.2]
+  -i <num> --iterations <num>                 Number of iterations.
+                                              haploclique will stop if the 
+                                              superreads converge.
+                                              [default: -1]
+  -f <num> --filter <num>                     Filter out reads with low
+                                              frequency.
+                                              [default: 0.0]
+  -n --no_singletons                          Filter out single read cliques
+                                              after first iteration.
 )";
 
 void usage() {
@@ -163,10 +175,6 @@ int main(int argc, char* argv[]) {
     if (args["<output>"]) outfile = args["<output>"].asString();
     string edge_filename = "";
     if (args["--write_edges"]) edge_filename = args["--write_edges"].asString();
-    string reads_output_filename = "";
-    if (args["--output_reads"]) reads_output_filename = args["--output_reads"].asString();
-    string coverage_output_filename = "";
-    if (args["--output_coverage"]) coverage_output_filename = args["--output_coverage"].asString();
     double edge_quasi_cutoff_cliques = stod(args["--edge_quasi_cutoff_cliques"].asString());
     double edge_quasi_cutoff_single = stod(args["--edge_quasi_cutoff_single"].asString());
     double edge_quasi_cutoff_mixed = stod(args["--edge_quasi_cutoff_mixed"].asString());
@@ -182,17 +190,11 @@ int main(int argc, char* argv[]) {
     double indel_edge_sig_level = stod(args["--indel_edge_sig_level"].asString());
     string indel_output_file = "";
     if (args["--call_indels"]) indel_output_file = args["--call_indels"].asString();
-    bool no_sort = args["--no_sort"].asBool();
-    string suffix = "";
-    if (args["--suffix"]) suffix = args["--suffix"].asString();
     int iterations = stoi(args["--iterations"].asString());
+    double filter = stod(args["--filter"].asString());
+    bool filter_singletons = args["--no_singletons"].asBool();
     // END PARAMETERS
 
-    bool output_all = args["--all"].asBool();
-    if (output_all && (reads_output_filename.size() > 0)) {
-        cerr << "Error: options -a and -r are mutually exclusive." << endl;
-        return 1;
-    }
     bool call_indels = indel_output_file.size() > 0;
     if (call_indels && (mean_and_sd_filename.size() == 0)) {
         cerr << "Error: when using option -I, option -M must also be given." << endl;
@@ -247,9 +249,9 @@ int main(int argc, char* argv[]) {
     CliqueCollector collector;
     CliqueFinder* clique_finder;
     if (args["bronkerbosch"].asBool()) {
-        clique_finder = new BronKerbosch(*edge_calculator, collector, read_groups, no_sort);
+        clique_finder = new BronKerbosch(*edge_calculator, collector, read_groups);
     } else {
-        clique_finder = new CLEVER(*edge_calculator, collector, read_groups, no_sort);
+        clique_finder = new CLEVER(*edge_calculator, collector, read_groups);
     }
     if (indel_edge_calculator != 0) {
         clique_finder->setSecondEdgeCalculator(indel_edge_calculator);
@@ -262,15 +264,11 @@ int main(int argc, char* argv[]) {
         clique_finder->setEdgeWriter(*edge_writer);
     }
     ofstream* reads_ofstream = 0;
-//    if (reads_output_filename.size() > 0) {
-//        reads_ofstream = new ofstream(reads_output_filename.c_str());
-//        clique_writer.enableReadListOutput(*reads_ofstream);
-//    }
 
     vector<string> originalReadNames;
     deque<AlignmentRecord*>* reads = readBamFile(bamfile, originalReadNames);
 
-    //TODO Abbruchbedingung
+    // Main loop
     int ct = 0;
     while (ct != iterations) {
         clique_finder->initialize();
@@ -286,14 +284,30 @@ int main(int argc, char* argv[]) {
         clique_finder->finish();
         reads = collector.finish();
 
-        cerr << ct << ": " << reads->size() << endl;
-        if (clique_finder->hasConverged()) break;
+        // Filter out cliques which are based on a single read in first iteration.
+        if (ct == 0 and filter_singletons) {
+            auto filter_fn = [](AlignmentRecord* al) { return al->getReadNames().size() <= 1; };
+            auto new_end_it = std::remove_if(reads->begin(), reads->end(), filter_fn);
+            reads->erase(new_end_it, reads->end());
+        }
 
-        ct++;
+        setProbabilities(*reads);
+
+        if (clique_finder->hasConverged()) break;
+        cout << ct++ << ": " << reads->size() << endl;
     }
 
+    // Filter superreads according to read probability
+    if (filter > 0.0) {
+        auto filter_fn = [&](AlignmentRecord* al) { return al->getProbability() < filter;};
+        auto new_end_it = std::remove_if(reads->begin(), reads->end(), filter_fn);
+        reads->erase(new_end_it, reads->end());
+    }
     ofstream os(outfile, std::ofstream::out);
+    setProbabilities(*reads);
     printReads(os, *reads);
+
+    cout << "final: " << reads->size() << endl;
 
     for (auto&& r : *reads) {
         delete r;
@@ -314,7 +328,9 @@ int main(int argc, char* argv[]) {
     if (reads_ofstream != nullptr) {
         delete reads_ofstream;
     }
+    cout.precision(3);
+    cout << std::fixed;
     double cpu_time = (double) (clock() - clock_start) / CLOCKS_PER_SEC;
-    cerr << "Needed " <<  round(cpu_time) << " seconds" << endl;
+    cout << "time:" <<  cpu_time << endl;
     return 0;
 }
