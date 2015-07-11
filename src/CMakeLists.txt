@@ -44,7 +44,11 @@ add_executable (haploclique
     docopt/docopt.cpp
 )
 
-target_link_libraries(haploclique ${Boost_LIBRARIES} BamTools)
+IF(${STATIC_LINKING} MATCHES "1")
+	target_link_libraries(haploclique ${Boost_LIBRARIES} BamTools-static)
+ELSE()
+    target_link_libraries(haploclique ${Boost_LIBRARIES} BamTools)
+ENDIF()
 
 set(ALL_EXE_TARGETS haploclique)
 

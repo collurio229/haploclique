@@ -28,14 +28,15 @@ SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/bin)
 
 enable_testing()
 
-find_package(Boost 1.36 COMPONENTS program_options iostreams unit_test_framework REQUIRED)
-find_package(ZLIB REQUIRED)
-find_package(Threads REQUIRED)
-
 IF(${STATIC_LINKING} MATCHES "1")
 	message("Statically linked binaries requested.")
 	SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
+    SET(Boost_USE_STATIC_LIBS ON)
 ENDIF()
+
+find_package(Boost 1.36 COMPONENTS program_options iostreams unit_test_framework REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(Threads REQUIRED)
 
 SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
 SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
