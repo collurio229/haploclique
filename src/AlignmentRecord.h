@@ -58,13 +58,10 @@ private:
 	int length_incl_deletions2;
 	int length_incl_longdeletions2;
 	ShortDnaSequence sequence2;
-	double aln_prob;
-	double aln_pair_prob_ins_length;
+    double probability;
 	alignment_id_t id;
 	bool single_end;
 	std::set<int> readNames;
-	int readCount;
-	int hcount;
     std::vector<std::string>* readNameMap;
 
     void mergeSequences(std::deque<std::pair<int, int>>, std::vector<ShortDnaSequence>, std::vector<std::vector<char>> unrolled_cigars);
@@ -80,9 +77,7 @@ public:
 	
 	/** Returns probability that alignment pair is correct based on alignment scores alone. */
 	double getProbability() const;
-	/** Returns probability that alignment pair is correct based on alignment scores and insert lenghts. */
-	double getProbabilityInsertLength() const;
-
+    
 	/** Returns start position of interval associated with this alignment record.
 	 *  In case of a single end read, interval corresponds to the alignment;
 	 *  in case of a paired end read, interval corresponds to the whole fragment, i.e. first alignment,
@@ -114,7 +109,6 @@ public:
 	const ShortDnaSequence& getSequence1() const;
 	const ShortDnaSequence& getSequence2() const;
 	int getReadGroup() const;
-	double getWeight() const;
 	unsigned int getInsertStart() const;
 	unsigned int getInsertEnd() const;
 	unsigned int getInsertLength() const;
@@ -123,9 +117,6 @@ public:
 	bool isSingleEnd() const;
 	bool isPairedEnd() const;
 	std::vector<std::string> getReadNames() const;
-	int getReadCount() const;
-	int getHCount() const;
-	int getCount() const;
 	const std::vector<char> getCigar1Unrolled() const;
 	const std::vector<char> getCigar2Unrolled() const;
 	int getLengthInclDeletions1() const;
@@ -133,6 +124,7 @@ public:
 	int getLengthInclLongDeletions1() const;
 	int getLengthInclLongDeletions2() const;
 
+    friend void setProbabilities(std::deque<AlignmentRecord*>& reads);
     friend void printReads(std::ostream& output, std::deque<AlignmentRecord*>&);
 };
 

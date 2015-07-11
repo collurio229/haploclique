@@ -43,9 +43,7 @@ int phred_sum(const string& phred, char phred_base=33) {
 }
 
 AlignmentRecord::AlignmentRecord(const BamTools::BamAlignment& alignment, int readRef, vector<string>* rnm) : readNameMap(rnm) {
-    this->hcount = 0;
     this->single_end = true;
-    this->readCount = 1;
     this->readNames.insert(readRef);
     this->name = alignment.Name;
     this->start1 = alignment.Position + 1;
@@ -96,7 +94,6 @@ AlignmentRecord::AlignmentRecord(unique_ptr<vector<const AlignmentRecord*>>& ali
             ct++;
         }
 
-        this->readCount += al->readCount;
         this->readNames.insert(al->readNames.begin(), al->readNames.end());
     }
 
@@ -347,12 +344,7 @@ int AlignmentRecord::getPhredSum2() const {
 }
 
 double AlignmentRecord::getProbability() const {
-	return aln_prob;
-}
-
-double AlignmentRecord::getProbabilityInsertLength() const {
-	assert(!single_end);
-	return aln_pair_prob_ins_length;
+	return probability;
 }
 
 std::string AlignmentRecord::getChrom1() const {
@@ -422,14 +414,6 @@ int AlignmentRecord::getReadGroup() const {
 	return read_group;
 }
 
-double AlignmentRecord::getWeight() const { 
-	if (single_end) {
-		return aln_prob;
-	} else {
-		return aln_pair_prob_ins_length;
-	}
-}
-
 unsigned int AlignmentRecord::getIntervalStart() const {
 	return start1;
 }
@@ -481,18 +465,6 @@ std::vector<std::string> AlignmentRecord::getReadNames() const {
 	return rnames;
 }
 
-int AlignmentRecord::getReadCount() const {
-	return this->readCount;
-}
-int AlignmentRecord::getHCount() const {
-	return this->hcount;
-}
-int AlignmentRecord::getCount() const {
-	if (this->hcount+this->readCount < 0) {
-		cerr << "GETCOUNT: " << this->hcount << "\t" << this->readCount << endl;
-	}
-	return this->hcount+this->readCount;
-}
 const std::vector<char> AlignmentRecord::getCigar1Unrolled() const {
 	return this->cigar1_unrolled;
 }
@@ -512,21 +484,36 @@ int AlignmentRecord::getLengthInclLongDeletions2() const {
 	return this->length_incl_longdeletions2;
 }
 
-void printReads(std::ostream& outfile, std::deque<AlignmentRecord*>& reads) {
-    auto comp = [&](AlignmentRecord* al1, AlignmentRecord* al2) { return al1->readNames.size() > al2->readNames.size(); };
-    std::sort(reads.begin(), reads.end(), comp);
-
+void setProbabilities(std::deque<AlignmentRecord*>& reads) {
     double read_usage_ct = 0.0;
-    for(auto r : reads) {
+    for(auto&& r : reads) {
         read_usage_ct += r->readNames.size();
     }
 
     for (auto&& r : reads) {
-        double prob = r->readNames.size() / read_usage_ct;
-        outfile << r->name << "\t" << prob << endl;
+        r->probability = r->readNames.size() / read_usage_ct;
+    }
+}
+
+void printReads(std::ostream& outfile, std::deque<AlignmentRecord*>& reads) {
+    auto comp = [](AlignmentRecord* al1, AlignmentRecord* al2) { return al1->probability > al2->probability; };
+    std::sort(reads.begin(), reads.end(), comp);
+
+    outfile.precision(5);
+    outfile << std::fixed;
+
+    for (auto&& r : reads) {
+        outfile << r->name;
+        if (not r->single_end) outfile << "|paired";
+        outfile << "|ht_freq:" << r->probability << endl;
+
         outfile << r->sequence1;
+
         if (not r->single_end) {
-            outfile << "\t" << r->sequence2;
+            for(unsigned int i = r->end1; i < r->start2; i++) {
+                outfile << "N";
+            }
+            outfile << r->sequence2;
         }
         outfile << endl;
     }
