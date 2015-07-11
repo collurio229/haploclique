@@ -27,7 +27,7 @@ private:
     void printReads(std::ostream& os, alignment_set_t set);
     bool cliquesistent(const alignment_set_t& R, const alignment_set_t& P, const alignment_set_t& X);
 public:
-    BronKerbosch(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort);
+    BronKerbosch(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups);
     virtual ~BronKerbosch();
 
     virtual const AlignmentRecord & getAlignmentByIndex(size_t index) const {

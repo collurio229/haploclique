@@ -37,7 +37,7 @@ private:
     std::set<length_and_index_t> alignments_by_length;
     void reorganize_storage();
 public:
-    CLEVER(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort);
+    CLEVER(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups);
     virtual ~CLEVER();
 
     const AlignmentRecord & getAlignmentByIndex(size_t index) const {

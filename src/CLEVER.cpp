@@ -28,7 +28,7 @@
 using namespace std;
 using namespace boost;
 
-CLEVER::CLEVER(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort) : CliqueFinder(edge_calculator, clique_collector, read_groups, no_sort) {
+CLEVER::CLEVER(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups) : CliqueFinder(edge_calculator, clique_collector, read_groups) {
     capacity = alignment_set_t::bits_per_block;
     alignments = nullptr;
 }
@@ -223,12 +223,7 @@ void CLEVER::addAlignment(std::unique_ptr<AlignmentRecord>& alignment_autoptr) {
 	if (new_cliques.size() == 0) {
 		new_cliques.push_back(new Clique(*this, index, capacity));
 	}
-	//clock_t clock_start = clock();
-	//int clique_size_old = new_cliques.size();
-	if (no_sort == 0) {
-		sort(new_cliques.begin(), new_cliques.end(), clique_comp_t());
-		new_cliques.erase(std::unique(new_cliques.begin(), new_cliques.end(),clique_equal_t()), new_cliques.end());
-	}
+
 	// check for subset relations and delete cliques that are subsets of others
 	for (size_t i=0; i<new_cliques.size(); ++i) {
 		if (new_cliques[i]==0) continue;

@@ -6,8 +6,8 @@
 // using namespace boost;
 using namespace std;
 
-BronKerbosch::BronKerbosch(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups, bool no_sort)
-: CliqueFinder(edge_calculator, clique_collector, read_groups, no_sort), alignments_() {
+BronKerbosch::BronKerbosch(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups)
+: CliqueFinder(edge_calculator, clique_collector, read_groups), alignments_() {
     order_ = nullptr;
     vertices_ = nullptr;
     degree_map_ = nullptr;
