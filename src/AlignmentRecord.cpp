@@ -47,7 +47,7 @@ AlignmentRecord::AlignmentRecord(const BamTools::BamAlignment& alignment, int re
     this->readNames.insert(readRef);
     this->name = alignment.Name;
     this->start1 = alignment.Position + 1;
-    this->end1 = alignment.GetEndPosition() + 1;
+    this->end1 = alignment.GetEndPosition();
     this->cigar1 = alignment.CigarData;
     this->sequence1 = ShortDnaSequence(alignment.QueryBases, alignment.Qualities);
     this->phred_sum1 = phred_sum(alignment.Qualities);
@@ -79,18 +79,18 @@ AlignmentRecord::AlignmentRecord(unique_ptr<vector<const AlignmentRecord*>>& ali
             sequences.push_back(al->getSequence1());
             unrolled_cigars.push_back(al->getCigar1Unrolled());
             interval.push_back(pair<int, int>(ct, al->getStart1() - 1));
-            interval.push_back(pair<int, int>(ct, al->getEnd1() - 2));
+            interval.push_back(pair<int, int>(ct, al->getEnd1() - 1));
             ct++;
             sequences.push_back(al->getSequence2());
             unrolled_cigars.push_back(al->getCigar2Unrolled());
             interval.push_back(pair<int, int>(ct, al->getStart2() - 1));
-            interval.push_back(pair<int, int>(ct, al->getEnd2() - 2));
+            interval.push_back(pair<int, int>(ct, al->getEnd2() - 1));
             ct++;
         } else {
             sequences.push_back(al->getSequence1());
             unrolled_cigars.push_back(al->getCigar1Unrolled());
             interval.push_back(pair<int, int>(ct, al->getStart1() - 1));
-            interval.push_back(pair<int, int>(ct, al->getEnd1() - 2));
+            interval.push_back(pair<int, int>(ct, al->getEnd1() - 1));
             ct++;
         }
 
@@ -162,6 +162,8 @@ void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, 
     this->start1 = next + 1;
     this->single_end = true;
 
+    int j = 0;
+
     // Go over all intervals
     while(not intervals.empty()) {
         if (overlaps.size() < 2) {
@@ -170,8 +172,11 @@ void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, 
                 this->phred_sum2 = phred_sum(qual);
                 this->sequence2 = ShortDnaSequence(seq, qual);
                 this->cigar2_unrolled = ur_cigar;
+                this->single_end = false;
                 break;
             } else {
+                j = 0;
+
                 this->phred_sum1 = phred_sum(qual);
                 this->sequence1 = ShortDnaSequence(seq, qual);
                 this->end1 = next + 1;
@@ -195,7 +200,6 @@ void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, 
                     next = p.second;
                 }
                 if (intervals.empty()) break;
-                this->single_end = false;
                 this->start2 = next + 1;
             }
         }
@@ -221,14 +225,16 @@ void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, 
 
             seq.push_back(max_key);
             qual.push_back( (char) round(-10*log10(1-basemap[max_key]) + 33) );
-            ur_cigar.push_back(unrolled_cigars[overlaps.begin()->first][i - overlaps.begin()->second]);
-            int j = 1;
+        
             char nextcigar = unrolled_cigars[overlaps.begin()->first][i - overlaps.begin()->second + j];
             while(nextcigar == 'D') {
                 ur_cigar.push_back(nextcigar);
                 j++;
                 nextcigar = unrolled_cigars[overlaps.begin()->first][i - overlaps.begin()->second + j];
             }
+
+            ur_cigar.push_back(nextcigar);
+
         }
 
         if (it == overlaps.end()) {
@@ -238,11 +244,23 @@ void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, 
         }
     }
 
+    this->length_incl_deletions1 = this->sequence1.size();
+    this->length_incl_longdeletions1 = this->sequence1.size();
+
     int ind = 0;
     char currentType = this->cigar1_unrolled[0];
     for (unsigned int i = 0; i < this->cigar1_unrolled.size(); i++) {
         if(this->cigar1_unrolled[i] != currentType) {
-            this->cigar1.push_back(BamTools::CigarOp(currentType, i - ind + 1));
+            unsigned int length = i - ind + 1;
+
+            this->cigar1.push_back(BamTools::CigarOp(currentType, length));
+
+            if (currentType == 'D') {
+                this->length_incl_deletions1 += length;
+                if (length > 1) {
+                    this->length_incl_longdeletions1 += length;
+                }
+            }
 
             currentType = this->cigar1_unrolled[i];
             ind = i;
@@ -250,12 +268,26 @@ void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, 
     }
 
     if (not this->single_end) {
+        assert(this->cigar2_unrolled.size() > 0);
+
+        this->length_incl_deletions2 = this->sequence2.size();
+        this->length_incl_longdeletions2 = this->sequence2.size();
+
+
         ind = 0;
         currentType = this->cigar2_unrolled[0];
         for (unsigned int i = 0; i < this->cigar2_unrolled.size(); i++) {
             if(this->cigar2_unrolled[i] != currentType) {
-                this->cigar2.push_back(BamTools::CigarOp(currentType, i - ind + 1));
+                unsigned int length = i - ind + 1;
 
+                this->cigar2.push_back(BamTools::CigarOp(currentType, length));
+
+                if (currentType == 'D') {
+                    this->length_incl_deletions2 += length;
+                    if (length > 1) {
+                        this->length_incl_longdeletions2 += length;
+                    }
+                }
                 currentType = this->cigar2_unrolled[i];
                 ind = i;
             }
@@ -267,7 +299,7 @@ void AlignmentRecord::pairWith(const BamTools::BamAlignment& alignment) {
     this->single_end = false;
     if (alignment.Position > this->start1) {
         this->start2 = alignment.Position + 1;
-        this->end2 = alignment.GetEndPosition() + 1;
+        this->end2 = alignment.GetEndPosition();
         this->cigar2 = alignment.CigarData;
         this->sequence2 = ShortDnaSequence(alignment.QueryBases, alignment.Qualities);
         this->phred_sum2 = phred_sum(alignment.Qualities);
@@ -292,7 +324,7 @@ void AlignmentRecord::pairWith(const BamTools::BamAlignment& alignment) {
         this->sequence2 = this->sequence1;
         this->phred_sum2 = this->phred_sum1;
         this->start1 = alignment.Position + 1;
-        this->end1 = alignment.GetEndPosition() + 1;
+        this->end1 = alignment.GetEndPosition();
         this->cigar1 = alignment.CigarData;
         this->sequence1 = ShortDnaSequence(alignment.QueryBases, alignment.Qualities);
         this->phred_sum1 = phred_sum(alignment.Qualities);

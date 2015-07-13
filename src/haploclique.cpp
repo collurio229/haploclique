@@ -281,6 +281,8 @@ int main(int argc, char* argv[]) {
             reads->pop_front();
         }
 
+        delete reads;
+
         clique_finder->finish();
         reads = collector.finish();
 
@@ -331,6 +333,6 @@ int main(int argc, char* argv[]) {
     cout.precision(3);
     cout << std::fixed;
     double cpu_time = (double) (clock() - clock_start) / CLOCKS_PER_SEC;
-    cout << "time:" <<  cpu_time << endl;
+    cout << "time: " <<  cpu_time << endl;
     return 0;
 }
