@@ -93,10 +93,13 @@ options:
                                               superreads converge.
                                               [default: -1]
   -f <num> --filter <num>                     Filter out reads with low
-                                              frequency.
+                                              frequency at the end.
                                               [default: 0.0]
   -n --no_singletons                          Filter out single read cliques
                                               after first iteration.
+  -s <num> --significance <num>               Filter out reads with low
+                                              frequency after every iteration.
+                                              [default: 0.01]
 )";
 
 void usage() {
@@ -192,6 +195,7 @@ int main(int argc, char* argv[]) {
     if (args["--call_indels"]) indel_output_file = args["--call_indels"].asString();
     int iterations = stoi(args["--iterations"].asString());
     double filter = stod(args["--filter"].asString());
+    double significance = stod(args["--significance"].asString());
     bool filter_singletons = args["--no_singletons"].asBool();
     // END PARAMETERS
 
@@ -270,6 +274,11 @@ int main(int argc, char* argv[]) {
 
     // Main loop
     int ct = 0;
+    auto filter_fn = [&](unique_ptr<AlignmentRecord>& read) {
+        return (ct == 1 and filter_singletons and read->getReadCount() <= 1) or (ct > 0 and read->getProbability() < significance);
+    };
+
+
     while (ct != iterations) {
         clique_finder->initialize();
 
@@ -277,21 +286,18 @@ int main(int argc, char* argv[]) {
             assert(reads->front() != nullptr);
 
             unique_ptr<AlignmentRecord> al_ptr(reads->front());
-            clique_finder->addAlignment(al_ptr);
+
             reads->pop_front();
+
+            if (filter_fn(al_ptr)) continue;
+
+            clique_finder->addAlignment(al_ptr);
         }
 
         delete reads;
 
         clique_finder->finish();
         reads = collector.finish();
-
-        // Filter out cliques which are based on a single read in first iteration.
-        if (ct == 0 and filter_singletons) {
-            auto filter_fn = [](AlignmentRecord* al) { return al->getReadNames().size() <= 1; };
-            auto new_end_it = std::remove_if(reads->begin(), reads->end(), filter_fn);
-            reads->erase(new_end_it, reads->end());
-        }
 
         setProbabilities(*reads);
 
@@ -303,6 +309,10 @@ int main(int argc, char* argv[]) {
     if (filter > 0.0) {
         auto filter_fn = [&](AlignmentRecord* al) { return al->getProbability() < filter;};
         auto new_end_it = std::remove_if(reads->begin(), reads->end(), filter_fn);
+        for (auto it = new_end_it; it != reads->end(); it++) {
+            delete *it;
+            *it = nullptr;
+        }
         reads->erase(new_end_it, reads->end());
     }
     ofstream os(outfile, std::ofstream::out);

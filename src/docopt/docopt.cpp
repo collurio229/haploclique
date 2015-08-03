@@ -163,8 +163,6 @@ bool LeafPattern::match(PatternList& left, std::vector<std::shared_ptr<LeafPatte
 
 Option Option::parse(std::string const& option_description)
 {
-//    std::cout << "I got following option description for parsing:\n" << option_description << "\n";
-
 	std::string shortOption, longOption;
 	int argcount = 0;
 	value val { false };
@@ -175,13 +173,13 @@ Option Option::parse(std::string const& option_description)
 		options_end = option_description.begin() + double_space;
 	}
 	
-	static const std::regex pattern {"(--|-)?([^-].*?)([,= ]+|$)"};
+	static const std::regex pattern {"(--|-)?(.*?)([,= ]|$)"};
 	for(std::sregex_iterator i {option_description.begin(), options_end, pattern, std::regex_constants::match_not_null},
 	       e{};
 	    i != e;
 	    ++i)
 	{
- 		std::smatch const& match = *i;
+		std::smatch const& match = *i;
 		if (match[1].matched) { // [1] is optional.
 			if (match[1].length()==1) {
 				shortOption = "-" + match[2].str();
@@ -212,6 +210,7 @@ Option Option::parse(std::string const& option_description)
 			val = match[1].str();
 		}
 	}
+	
 	return {std::move(shortOption),
 		std::move(longOption),
 		argcount,
@@ -1022,32 +1021,11 @@ docopt::docopt_parse(std::string const& doc,
 	} catch (Tokens::OptionError const& error) {
 		throw DocoptArgumentError(error.what());
 	}
-
-//    std::cout << "Following options were parsed:\n";
-//    for (auto&& opt : options) {
-//        std::cout << opt.shortOption() << ", " << opt.longOption() << ", " << opt.argCount() << "\n";
-//    }
-
-//    std::cout << "I read following options:\n";
-//    for (auto&& arg : argv_patterns) {
-//        std::cout << arg->name() << "\n";
-//    }
-
+	
 	extras(help, version, argv_patterns);
 	
 	std::vector<std::shared_ptr<LeafPattern>> collected;
 	bool matched = pattern.fix().match(argv_patterns, collected);
-
-//    std::cout << "I collected following options:\n";
-//    for (auto&& arg : collected) {
-//        std::cout << arg->name() << "\n";
-//    }
-
-//    std::cout << "These options are left:\n";
-//    for (auto&& arg : argv_patterns) {
-//        std::cout << arg->name() << "\n";
-//    }
-
 	if (matched && argv_patterns.empty()) {
 		std::map<std::string, value> ret;
 		

@@ -64,14 +64,16 @@ private:
 	std::set<int> readNames;
     std::vector<std::string>* readNameMap;
 
-    void mergeSequences(std::deque<std::pair<int, int>>, std::vector<ShortDnaSequence>, std::vector<std::vector<char>> unrolled_cigars);
+    void mergeSequences(std::deque<std::pair<int, int>>, std::vector<ShortDnaSequence>, std::vector<std::vector<BamTools::CigarOp>> cigars);
+
+    void getCigarInterval(unsigned int start, unsigned int end, std::vector<BamTools::CigarOp>& new_cigar, const std::vector<BamTools::CigarOp>& original_cigar, unsigned int interval_start);
 public:
     AlignmentRecord(const BamTools::BamAlignment& alignment, int id, std::vector<std::string>* readNameMap);
     AlignmentRecord(std::unique_ptr<std::vector<const AlignmentRecord*>>& alignments, int clique_id);
 
     void pairWith(const BamTools::BamAlignment& alignment);
 
-	unsigned int getRecordNr() const;
+    unsigned int getRecordNr() const;
 	int getPhredSum1() const;
 	int getPhredSum2() const;
 	
@@ -123,6 +125,8 @@ public:
 	int getLengthInclDeletions2() const;
 	int getLengthInclLongDeletions1() const;
 	int getLengthInclLongDeletions2() const;
+
+    unsigned int getReadCount() const { return readNames.size(); };
 
     friend void setProbabilities(std::deque<AlignmentRecord*>& reads);
     friend void printReads(std::ostream& output, std::deque<AlignmentRecord*>&);

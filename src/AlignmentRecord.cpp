@@ -66,10 +66,10 @@ AlignmentRecord::AlignmentRecord(const BamTools::BamAlignment& alignment, int re
     }
 }
 
-AlignmentRecord::AlignmentRecord(unique_ptr<vector<const AlignmentRecord*>>& alignments, int clique_id) {
+AlignmentRecord::AlignmentRecord(unique_ptr<vector<const AlignmentRecord*>>& alignments, int clique_id) : cigar1_unrolled(), cigar2_unrolled() {
     deque<pair<int, int>> interval;
     vector<ShortDnaSequence> sequences;
-    vector<vector<char>> unrolled_cigars;
+    vector<vector<BamTools::CigarOp>> cigars;
     int ct = 0;
 
     this->readNameMap = (*alignments)[0]->readNameMap;
@@ -77,18 +77,18 @@ AlignmentRecord::AlignmentRecord(unique_ptr<vector<const AlignmentRecord*>>& ali
     for (auto al : *alignments) {
         if (al->isPairedEnd()) {
             sequences.push_back(al->getSequence1());
-            unrolled_cigars.push_back(al->getCigar1Unrolled());
+            cigars.push_back(al->getCigar1());
             interval.push_back(pair<int, int>(ct, al->getStart1() - 1));
             interval.push_back(pair<int, int>(ct, al->getEnd1() - 1));
             ct++;
             sequences.push_back(al->getSequence2());
-            unrolled_cigars.push_back(al->getCigar2Unrolled());
+            cigars.push_back(al->getCigar2());
             interval.push_back(pair<int, int>(ct, al->getStart2() - 1));
             interval.push_back(pair<int, int>(ct, al->getEnd2() - 1));
             ct++;
         } else {
             sequences.push_back(al->getSequence1());
-            unrolled_cigars.push_back(al->getCigar1Unrolled());
+            cigars.push_back(al->getCigar1());
             interval.push_back(pair<int, int>(ct, al->getStart1() - 1));
             interval.push_back(pair<int, int>(ct, al->getEnd1() - 1));
             ct++;
@@ -100,13 +100,20 @@ AlignmentRecord::AlignmentRecord(unique_ptr<vector<const AlignmentRecord*>>& ali
     auto comp = [](pair<int, int> a, pair<int, int> b) { return a.second < b.second; };
     std::sort(interval.begin(), interval.end(), comp);
 
-    mergeSequences(interval, sequences, unrolled_cigars);
+    mergeSequences(interval, sequences, cigars);
 
     this->name = "Clique_" + to_string(clique_id);
 
     this->length_incl_deletions1 = this->sequence1.size();
     this->length_incl_longdeletions1 = this->sequence1.size();
-	for (const auto& it : cigar1) {
+
+    unsigned int length_ct = 0; // DEBUG
+	for (const auto& it : cigar1) { //DEBUG
+        length_ct += it.Length;        
+
+        for (unsigned int s = 0; s < it.Length; ++s) {
+          	this->cigar1_unrolled.push_back(it.Type);
+        }
         if (it.Type == 'D') {
       		this->length_incl_deletions1+=it.Length;
        		if (it.Length > 1) {
@@ -114,22 +121,32 @@ AlignmentRecord::AlignmentRecord(unique_ptr<vector<const AlignmentRecord*>>& ali
        		}
        	}
     }
+    assert(length_ct == this->length_incl_deletions1); //DEBUG
+
 
     if(not this->single_end) {
         this->length_incl_deletions2 = this->sequence2.size();
         this->length_incl_longdeletions2 = this->sequence2.size();
+
+        length_ct = 0; //DEBUG
 	    for (const auto& it : cigar2) {
+            length_ct += it.Length; //DEBUG
+
+            for (unsigned int s = 0; s < it.Length; ++s) {
+              	this->cigar2_unrolled.push_back(it.Type);
+            }
             if (it.Type == 'D') {
-      	    	this->length_incl_deletions2+=it.Length;
-       	    	if (it.Length > 1) {
-       	    		this->length_incl_longdeletions2+=it.Length;
-       	    	}
-       	    }
+          		this->length_incl_deletions2+=it.Length;
+           		if (it.Length > 1) {
+           			this->length_incl_longdeletions2+=it.Length;
+           		}
+           	}
         }
+        assert(length_ct == this->length_incl_deletions2); //DEBUG
     }
 }
 
-void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, vector<ShortDnaSequence> to_merge, vector<vector<char>> unrolled_cigars) {
+void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, vector<ShortDnaSequence> to_merge, vector<vector<BamTools::CigarOp>> cigars) {
 
     assert(intervals.size() > 2);
 
@@ -157,12 +174,10 @@ void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, 
 
     string seq;
     string qual;
-    vector<char> ur_cigar;
+    vector<BamTools::CigarOp> cigar;
 
     this->start1 = next + 1;
     this->single_end = true;
-
-    int j = 0;
 
     // Go over all intervals
     while(not intervals.empty()) {
@@ -171,19 +186,17 @@ void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, 
                 this->end2 = next + 1;
                 this->phred_sum2 = phred_sum(qual);
                 this->sequence2 = ShortDnaSequence(seq, qual);
-                this->cigar2_unrolled = ur_cigar;
+                this->cigar2 = cigar;
                 this->single_end = false;
                 break;
             } else {
-                j = 0;
-
                 this->phred_sum1 = phred_sum(qual);
                 this->sequence1 = ShortDnaSequence(seq, qual);
                 this->end1 = next + 1;
-                this->cigar1_unrolled = ur_cigar;
+                this->cigar1 = cigar;
                 seq = "";
                 qual = "";
-                ur_cigar.clear();
+                cigar.clear();
 
                 paired = true;
 
@@ -210,6 +223,8 @@ void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, 
         auto it = overlaps.find(p.first);
         next = p.second;
 
+        getCigarInterval(i, next, cigar, cigars[overlaps.begin()->first], overlaps.begin()->second);
+
         for (; i < next; i++) {
             map<char, double> basemap;
             
@@ -224,73 +239,13 @@ void AlignmentRecord::mergeSequences(std::deque<std::pair<int, int>> intervals, 
             }
 
             seq.push_back(max_key);
-            qual.push_back( (char) round(-10*log10(1-basemap[max_key]) + 33) );
-        
-            char nextcigar = unrolled_cigars[overlaps.begin()->first][i - overlaps.begin()->second + j];
-            while(nextcigar == 'D') {
-                ur_cigar.push_back(nextcigar);
-                j++;
-                nextcigar = unrolled_cigars[overlaps.begin()->first][i - overlaps.begin()->second + j];
-            }
-
-            ur_cigar.push_back(nextcigar);
-
+            qual.push_back( (char) round(-10*log10(1-basemap[max_key]) + 33) );           
         }
 
         if (it == overlaps.end()) {
             overlaps.insert(p);
         } else {
             overlaps.erase(it);
-        }
-    }
-
-    this->length_incl_deletions1 = this->sequence1.size();
-    this->length_incl_longdeletions1 = this->sequence1.size();
-
-    int ind = 0;
-    char currentType = this->cigar1_unrolled[0];
-    for (unsigned int i = 0; i < this->cigar1_unrolled.size(); i++) {
-        if(this->cigar1_unrolled[i] != currentType) {
-            unsigned int length = i - ind + 1;
-
-            this->cigar1.push_back(BamTools::CigarOp(currentType, length));
-
-            if (currentType == 'D') {
-                this->length_incl_deletions1 += length;
-                if (length > 1) {
-                    this->length_incl_longdeletions1 += length;
-                }
-            }
-
-            currentType = this->cigar1_unrolled[i];
-            ind = i;
-        }
-    }
-
-    if (not this->single_end) {
-        assert(this->cigar2_unrolled.size() > 0);
-
-        this->length_incl_deletions2 = this->sequence2.size();
-        this->length_incl_longdeletions2 = this->sequence2.size();
-
-
-        ind = 0;
-        currentType = this->cigar2_unrolled[0];
-        for (unsigned int i = 0; i < this->cigar2_unrolled.size(); i++) {
-            if(this->cigar2_unrolled[i] != currentType) {
-                unsigned int length = i - ind + 1;
-
-                this->cigar2.push_back(BamTools::CigarOp(currentType, length));
-
-                if (currentType == 'D') {
-                    this->length_incl_deletions2 += length;
-                    if (length > 1) {
-                        this->length_incl_longdeletions2 += length;
-                    }
-                }
-                currentType = this->cigar2_unrolled[i];
-                ind = i;
-            }
         }
     }
 }
@@ -346,6 +301,55 @@ void AlignmentRecord::pairWith(const BamTools::BamAlignment& alignment) {
            		}
            	}
         }
+    }
+}
+
+void AlignmentRecord::getCigarInterval(unsigned int start, unsigned int end, vector<BamTools::CigarOp>& new_cigar, const vector<BamTools::CigarOp>& original_cigar, unsigned int interval_start) {
+    assert(start <= end);    
+    assert(interval_start <= start);
+
+    if (start == end) return;
+
+    auto it = original_cigar.begin();
+
+    while(interval_start + it->Length < start or it->Type == 'D') {
+        if (it->Type != 'D') {   
+            interval_start += it->Length;
+        }
+        it++;
+    }
+
+    if (not new_cigar.empty() and it->Type == new_cigar.back().Type) {
+        if (interval_start + it->Length >= end) {
+            new_cigar.back().Length += end - start;
+            return;
+        } else {
+            new_cigar.back().Length += interval_start + it->Length - start;
+        }
+        interval_start += it->Length;
+        it++;
+    }
+
+    while (it != original_cigar.end() and (interval_start + it->Length < end or it->Type == 'D')) {
+        
+        BamTools::CigarOp op;
+        op.Type = it->Type;
+        op.Length = min(interval_start + it->Length - start, it->Length);
+
+        new_cigar.push_back(op);
+
+        if (it->Type != 'D') {
+            interval_start += it->Length;
+        }
+        it++;
+    }
+
+    if(it != original_cigar.end()) {
+        BamTools::CigarOp op;
+        op.Type = it->Type;
+        op.Length = end - max(interval_start, start);
+
+        new_cigar.push_back(op);
     }
 }
 
@@ -519,11 +523,11 @@ int AlignmentRecord::getLengthInclLongDeletions2() const {
 void setProbabilities(std::deque<AlignmentRecord*>& reads) {
     double read_usage_ct = 0.0;
     for(auto&& r : reads) {
-        read_usage_ct += r->readNames.size();
+        read_usage_ct += r->getReadCount();
     }
 
     for (auto&& r : reads) {
-        r->probability = r->readNames.size() / read_usage_ct;
+        r->probability = r->getReadCount() / read_usage_ct;
     }
 }
 
