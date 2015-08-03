@@ -13,10 +13,7 @@ Usage:
               args_name.log    - logfile containing used arguments (optional)
 
 Options:
-  -i <num>, --iterations <num>  number of haploclique iterations [default: 5]
   -p <path>, --path <path>      path to haploclique binaries [default: ../bin]
-  -m --metric                   Compute match metric between quasispecies
-                                and haplotypes
 """
 
 from subprocess import call, check_call
@@ -32,9 +29,8 @@ import resource
 
 from progressdone import *
 from Sequence import *
-import haploclique
 
-COVERAGES = [32, 128, 512, 1024, 2048]
+COVERAGES = [32, 128, 512, 1024]
 
 class UnknownFileError(Exception):
     """Raise this error if a file doesn't apply to naming conventions.
@@ -145,19 +141,18 @@ def execute(dataset, args, bk):
 
     path = tempfile.mkdtemp(prefix='hcl_')
 
-    haplofiles = ['-t', args['--iterations']]
-
     for member in archive.getmembers():
 
         if re.match(r'ref_(.*)\.fasta', member.name):
-            archive.extract(member, path)
+            #archive.extract(member, path)
             ref = member.name
         elif re.match(r'reads_(.*)\.bam', member.name):
             archive.extract(member, path)
             reads = member.name
         elif re.match(r'ht(\d+)_(.*)\.fasta', member.name):
-            archive.extract(member, path)
-            haplofiles.append(member.name)
+            pass
+            #archive.extract(member, path)
+            #haplofiles.append(member.name)
         elif re.match(r'args_(.*)\.log', member.name):
             logfile = archive.extractfile(member)
         else:
@@ -165,12 +160,11 @@ def execute(dataset, args, bk):
 
     log = parseLog(logfile)
 
-    if not log['no_ref']:
-        haplofiles.append(ref)
+    #if not log['no_ref']:
+    #    haplofiles.append(ref)
 
     # set the PATH variable to local haploclique binary
     pathvar = os.path.realpath(args['--path'])
-    os.environ['SAF'] = os.path.realpath(args['--path'])
 
     progress('Creating bam index', False)
 
@@ -179,53 +173,29 @@ def execute(dataset, args, bk):
 
     progress('Calling haploclique')
 
-    options = ['-t', args['--iterations'], '-w']
+    options = []
 
     if bk:
-        options += ['-B']
+        options += ['bronkerbosch']
 
-    res_start = resource.getrusage(resource.RUSAGE_CHILDREN)
+    options += ['-n', path + '/' + reads]
 
-    check_call(['haploclique-assembly', '-i', path + '/' + reads, '-r', path + '/' + ref, '-G'] + options)
+    time = 0.0
 
-    res_end = resource.getrusage(resource.RUSAGE_CHILDREN)
+    with tempfile.TemporaryFile() as tmpout:
+        check_call([pathvar + '/haploclique'] + options, stdout=tmpout)
 
-    time = (res_end.ru_utime + res_end.ru_stime) - (res_start.ru_utime + res_start.ru_stime)
+        tmpout.seek(0)
+
+        for line in tmpout:
+            m = re.match(r'time: (?P<time>[0-9.]+)', line.decode())
+
+            if m:
+                time = float(m.group('time'))
 
     print('needed', time, 'seconds')
 
     done('Calling haploclique')
-
-#    quasispecies = readFASTA('./quasispecies.fasta')
-    ref_sequences = []
-
-    if(args['--metric']):
-        progress('Computing match metric', False)
-
-        for hf in haplofiles:
-            ref_sequences.extend(readFASTA(path + '/' + hf))
-
-        print('forward error:', compute_best_match_score(ref_sequences, quasispecies))
-        print('backward error:', compute_best_match_score(quasispecies, ref_sequences))
-
-    remove_directory(path)
-
-    try:
-        os.unlink('alignment.prior')
-        if bk:
-            os.unlink('bk_cliques_intern.tsv')
-            os.unlink('bk_edges_intern.txt')
-        os.unlink('consensus.fasta')
-        os.unlink('deletions.txt')
-        os.unlink('mean-sd')
-        os.unlink('quasispecies.fasta')
-#    os.unlink('statistics.txt')
-        os.unlink('data_cliques_paired_R1.fastq')
-        os.unlink('data_cliques_paired_R2.fastq')
-        os.unlink('data_cliques_single.fastq')
-        os.unlink('data_clique_to_reads.tsv')
-    except OSError:
-        pass
 
     return time
 
