@@ -3,14 +3,7 @@
 bam alignment and compares the results with the given haplotype sequences.
 
 Usage:
-  run_data.py [options] <input>...
-
-  <input>   tar.gz archive which was either generated with simulate_data or
-            follows this naming conventions:
-              ref_name.fasta   - reference sequence
-              reads_name.bam   - reads as bam alignment
-              ht<i>_name.fasta - haplotype sequence number <i>
-              args_name.log    - logfile containing used arguments (optional)
+  run_data.py [options]
 
 Options:
   -p <path>, --path <path>      path to haploclique binaries [default: ../bin]
@@ -30,7 +23,7 @@ import resource
 from progressdone import *
 from Sequence import *
 
-COVERAGES = [32, 128, 512, 1024]
+COVERAGES = [32, 64, 128, 256, 512, 1024]
 
 class UnknownFileError(Exception):
     """Raise this error if a file doesn't apply to naming conventions.
@@ -101,14 +94,16 @@ def main(argv):
 
     args = docopt(__doc__, argv=argv)
 
+    archives = ['sht_arabis_short', 'sht_arabis_large', 'sht_HIV', 'sht_choristoneura', 'sht_mimivirus']
+
     with open('data.tex', 'w') as data:
 
         bk_algo = '\\begin{tabular}{l | c c c c c}\n'
         bk_whole = bk_algo
         cl_whole = bk_algo
 
-        bk_whole += ('& 32 & 128 & 512 & 1024 & 2048 \\\\\n')
-        cl_whole += ('& 32 & 128 & 512 & 1024 & 2048 \\\\\n')
+        bk_whole += ('& 32 & 64 & 128 & 256 & 512 & 1024 & 2048 \\\\\n')
+        cl_whole += ('& 32 & 64 & 128 & 256 & 512 & 1024 & 2048 \\\\\n')
 
         for archive in args['<input>']:
 
