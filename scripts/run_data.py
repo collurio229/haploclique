@@ -105,7 +105,7 @@ def main(argv):
         bk_whole += ('& 32 & 64 & 128 & 256 & 512 & 1024 & 2048 \\\\\n')
         cl_whole += ('& 32 & 64 & 128 & 256 & 512 & 1024 & 2048 \\\\\n')
 
-        for archive in args['<input>']:
+        for archive in archives:
 
             bk_whole += archive
             cl_whole += archive
