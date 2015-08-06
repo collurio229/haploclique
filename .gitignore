@@ -1,0 +1,12 @@
+build/*
+bin/*
+bwa/*
+lib/*
+include/*
+samtools/*
+htslib/*
+*~
+*.pyc
+haploclique
+quasispecies.fasta
+data/test/*
