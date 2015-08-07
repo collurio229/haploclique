@@ -42,15 +42,7 @@
 #include "CLEVER.h"
 #include "BronKerbosch.h"
 #include "CliqueCollector.h"
-#include "CoverageMonitor.h"
-#include "HistogramBasedDistribution.h"
 #include "AnyDistributionEdgeCalculator.h"
-#include "ReadSetSignificanceTester.h"
-#include "ReadSetZTester.h"
-#include "ReadSetGenericTester.h"
-#include "ReadGroups.h"
-#include "ReadGroupAwareEdgeCalculator.h"
-#include "ReadSetGroupWiseZTester.h"
 #include "GaussianEdgeCalculator.h"
 
 using namespace std;
@@ -97,9 +89,9 @@ options:
                                               [default: 0.0]
   -n --no_singletons                          Filter out single read cliques
                                               after first iteration.
-  -s <num> --significance <num>               Filter out reads with low
-                                              frequency after every iteration.
-                                              [default: 0.01]
+  -s <num> --significance <num>               Filter out reads witch are below
+                                              <num> standard deviations.
+                                              [default: 3.0]
 )";
 
 void usage() {
@@ -233,7 +225,6 @@ int main(int argc, char* argv[]) {
     clock_t clock_start = clock();
     EdgeCalculator* edge_calculator = nullptr;
     EdgeCalculator* indel_edge_calculator = nullptr;
-    ReadGroups* read_groups = nullptr;
     unique_ptr<vector<mean_and_stddev_t> > readgroup_params(nullptr);
     edge_calculator = new QuasispeciesEdgeCalculator(Q, edge_quasi_cutoff_cliques, overlap_cliques, frameshift_merge, simpson_map, edge_quasi_cutoff_single, overlap_single, edge_quasi_cutoff_mixed);
     if (call_indels) {
@@ -253,9 +244,9 @@ int main(int argc, char* argv[]) {
     CliqueCollector collector;
     CliqueFinder* clique_finder;
     if (args["bronkerbosch"].asBool()) {
-        clique_finder = new BronKerbosch(*edge_calculator, collector, read_groups);
+        clique_finder = new BronKerbosch(*edge_calculator, collector);
     } else {
-        clique_finder = new CLEVER(*edge_calculator, collector, read_groups);
+        clique_finder = new CLEVER(*edge_calculator, collector);
     }
     if (indel_edge_calculator != 0) {
         clique_finder->setSecondEdgeCalculator(indel_edge_calculator);
@@ -274,10 +265,10 @@ int main(int argc, char* argv[]) {
 
     // Main loop
     int ct = 0;
+    double stdev = 1.0;
     auto filter_fn = [&](unique_ptr<AlignmentRecord>& read) {
-        return (ct == 1 and filter_singletons and read->getReadCount() <= 1) or (ct > 0 and read->getProbability() < significance);
+        return (ct == 1 and filter_singletons and read->getReadCount() <= 1) or (ct > 1 and read->getProbability() < 1.0 / reads->size() - significance*stdev);
     };
-
 
     while (ct != iterations) {
         clique_finder->initialize();
@@ -299,7 +290,7 @@ int main(int argc, char* argv[]) {
         clique_finder->finish();
         reads = collector.finish();
 
-        setProbabilities(*reads);
+        stdev = setProbabilities(*reads);
 
         if (clique_finder->hasConverged()) break;
         cout << ct++ << ": " << reads->size() << endl;

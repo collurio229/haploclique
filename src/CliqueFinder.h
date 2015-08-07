@@ -4,10 +4,7 @@
 #include "CliqueCollector.h"
 #include "AlignmentRecord.h"
 #include "EdgeCalculator.h"
-#include "CoverageMonitor.h"
 #include "EdgeWriter.h"
-#include "ReadGroups.h"
-
 
 using namespace std;
 using namespace boost;
@@ -16,7 +13,6 @@ class CliqueFinder {
 protected:
     const EdgeCalculator & edge_calculator;
     CliqueCollector & clique_collector;
-    CoverageMonitor coverage_monitor;
     bool initialized;
     bool converged;
 
@@ -29,7 +25,7 @@ protected:
     alignment_id_t next_id;
 
 public:
-    CliqueFinder(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups) : edge_calculator(edge_calculator), clique_collector(clique_collector), coverage_monitor(read_groups) {
+    CliqueFinder(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector) : edge_calculator(edge_calculator), clique_collector(clique_collector) {
     	alignment_count = 0;
     	edge_writer = nullptr;
     	second_edge_calculator = nullptr;
@@ -46,8 +42,6 @@ public:
     virtual void initialize() = 0;
 
     virtual void finish() = 0;
-
-    virtual CoverageMonitor & getCoverageMonitor() { return coverage_monitor; }
 
     virtual const AlignmentRecord & getAlignmentByIndex(size_t index) const = 0;
 

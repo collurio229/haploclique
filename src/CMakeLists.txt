@@ -24,21 +24,12 @@ add_executable (haploclique
 	GaussianEdgeCalculator.cpp
 	EdgeWriter.cpp
 	AnyDistributionEdgeCalculator.cpp
-	ReadSetZTester.cpp
-	ReadSetGenericTester.cpp
-	ReadGroupAwareEdgeCalculator.cpp
-	ReadSetGroupWiseZTester.cpp
-	ReadGroups.cpp
 	AlignmentRecord.cpp
 	ShortDnaSequence.cpp
-	CoverageMonitor.cpp
-	SingleTrackCoverageMonitor.cpp
 	HistogramBasedDistribution.cpp
 	Distributions.cpp
-	BamHelper.cpp
 	VariationIndex.cpp
 	IndelLengthDistribution.cpp
-	PositionSet.cpp
 	Variation.cpp
 	NamedDnaSequence.cpp
     docopt/docopt.cpp

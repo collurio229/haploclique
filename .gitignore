@@ -9,3 +9,4 @@ htslib/*
 haploclique
 quasispecies.fasta
 data/test/*
+*.tar.gz

@@ -6,8 +6,8 @@
 // using namespace boost;
 using namespace std;
 
-BronKerbosch::BronKerbosch(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector, const ReadGroups* read_groups)
-: CliqueFinder(edge_calculator, clique_collector, read_groups), alignments_() {
+BronKerbosch::BronKerbosch(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector)
+: CliqueFinder(edge_calculator, clique_collector), alignments_() {
     order_ = nullptr;
     vertices_ = nullptr;
     degree_map_ = nullptr;
@@ -256,7 +256,6 @@ void BronKerbosch::addAlignment(std::unique_ptr<AlignmentRecord>& alignment_auto
 	alignment_id_t id = next_id++;
 	AlignmentRecord* alignment = alignment_autoptr.release();
 	alignment->setID(id);
-	coverage_monitor.addAlignment(*alignment);
 
 	size_t index = alignment_count++;
 	alignments_.push_back(alignment);

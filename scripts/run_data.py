@@ -9,7 +9,7 @@ Options:
   -p <path>, --path <path>      path to haploclique binaries [default: ../bin]
 """
 
-from subprocess import call, check_call
+from subprocess import call, check_call, CalledProcessError
 from docopt import docopt
 from shutil import rmtree as remove_directory
 import tarfile
@@ -19,11 +19,10 @@ import re
 import tempfile
 import os
 import resource
+import signal
 
 from progressdone import *
 from Sequence import *
-
-COVERAGES = [32, 64, 128, 256, 512, 1024]
 
 class UnknownFileError(Exception):
     """Raise this error if a file doesn't apply to naming conventions.
@@ -85,6 +84,24 @@ def parseLog(logfile):
 
     return log
 
+def write_data(bk, cl, filename):
+    with open(filename, 'w') as data:
+        print(r'\begin{tabular}{l | c c c c c}', file=data)
+        
+        for line in bk:
+            print(line + r'\\', file=data)
+
+        print(r'\caption{runtime of Bron-Kerbosch algorithm in regard to sequence and coverage}', file=data)
+        print(r'\end{tabular}', file=data)
+
+        print(r'\begin{tabular}{l | c c c c c}', file=data)
+        
+        for line in cl:
+            print(line + r'\\', file=data)
+
+        print(r'\caption{runtime of CLEVER algorithm in regard to sequence and coverage}', file=data)
+        print(r'\end{tabular}', file=data)
+
 def main(argv):
     """This script runs haploclique on the given reference sequence and
     bam alignment and compares the results with the given haplotype sequences.
@@ -94,40 +111,44 @@ def main(argv):
 
     args = docopt(__doc__, argv=argv)
 
-    archives = ['sht_arabis_short', 'sht_arabis_large', 'sht_HIV', 'sht_choristoneura', 'sht_mimivirus']
+    ARCHIVES = ['sht_arabis_short', 'sht_arabis_large', 'sht_HIV', 'sht_choristoneura', 'sht_mimivirus']
+    COVERAGES = [32, 64, 128, 256, 512, 1024]
 
-    with open('data.tex', 'w') as data:
+    bk = []
+    cl = []
 
-        bk_algo = '\\begin{tabular}{l | c c c c c}\n'
-        bk_whole = bk_algo
-        cl_whole = bk_algo
+    for archive in ARCHIVES:
 
-        bk_whole += ('& 32 & 64 & 128 & 256 & 512 & 1024 & 2048 \\\\\n')
-        cl_whole += ('& 32 & 64 & 128 & 256 & 512 & 1024 & 2048 \\\\\n')
+        bk.append(archive)
+        cl.append(archive)
 
-        for archive in archives:
+    ct = 0
 
-            bk_whole += archive
-            cl_whole += archive
+    for c in COVERAGES:
+        for archive in ARCHIVES:
+            print('Processing', archive + '_' + str(c) + '.tar.gz')
 
-            for c in COVERAGES:
-                print('Processing', archive + '_' + str(c) + '.tar.gz')
-
+            try:
                 bk_time = execute(archive + '_' + str(c) + '.tar.gz', args, True)
 
                 cl_time = execute(archive + '_' + str(c) + '.tar.gz', args, False)
+            except KeyboardInterrupt:
+                write_data(bk, cl, 'data.tex')
+                sys.exit(1)
+            except CalledProcessError as e:
+                write_data(bk, cl, 'data.tex')
+                print(e)
+                sys.exit(1)
+                    
 
-                bk_whole += '& ' + str(bk_time)
-                cl_whole += '& ' + str(cl_time)
+            bk[ct] += ' & ' + str(bk_time)
+            cl[ct] += ' & ' + str(cl_time)
 
-            bk_whole += '\\\\\n'
-            cl_whole += '\\\\\n'
+            ct += 1
 
-        bk_whole += '\\end{tabular}\n'
-        cl_whole += '\\end{tabular}\n'
+        ct = 0
 
-        data.write(bk_whole)
-        data.write(cl_whole)
+    write_data(bk, cl, 'data.tex')
 
 def execute(dataset, args, bk):
     progress('Opening archive', False)
