@@ -22,7 +22,6 @@ add_executable (haploclique
 	Clique.cpp
 	QuasispeciesEdgeCalculator.cpp
 	GaussianEdgeCalculator.cpp
-	EdgeWriter.cpp
 	AnyDistributionEdgeCalculator.cpp
 	AlignmentRecord.cpp
 	ShortDnaSequence.cpp

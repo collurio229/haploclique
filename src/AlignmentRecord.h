@@ -63,7 +63,7 @@ private:
     void getCigarInterval(unsigned int start, unsigned int end, std::vector<BamTools::CigarOp>& new_cigar, const std::vector<BamTools::CigarOp>& original_cigar, unsigned int interval_start);
 public:
     AlignmentRecord(const BamTools::BamAlignment& alignment, int id, std::vector<std::string>* readNameMap);
-    AlignmentRecord(std::unique_ptr<std::vector<const AlignmentRecord*>>& alignments, int clique_id);
+    AlignmentRecord(std::unique_ptr<std::vector<const AlignmentRecord*>>& alignments,unsigned int clique_id);
 
     void pairWith(const BamTools::BamAlignment& alignment);
 

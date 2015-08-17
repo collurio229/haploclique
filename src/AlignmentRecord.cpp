@@ -65,7 +65,7 @@ AlignmentRecord::AlignmentRecord(const BamTools::BamAlignment& alignment, int re
     }
 }
 
-AlignmentRecord::AlignmentRecord(unique_ptr<vector<const AlignmentRecord*>>& alignments, int clique_id) : cigar1_unrolled(), cigar2_unrolled() {
+AlignmentRecord::AlignmentRecord(unique_ptr<vector<const AlignmentRecord*>>& alignments, unsigned int clique_id) : cigar1_unrolled(), cigar2_unrolled() {
     deque<pair<int, int>> interval;
     vector<ShortDnaSequence> sequences;
     vector<vector<BamTools::CigarOp>> cigars;
@@ -496,6 +496,9 @@ double setProbabilities(std::deque<AlignmentRecord*>& reads) {
         read_usage_ct += r->getReadCount();
     }
 
+    if (not reads.empty()) {
+        read_usage_ct = max(read_usage_ct, (double) reads[0]->readNameMap->size());
+    }
     double stdev = 0.0;
 
     for (auto&& r : reads) {

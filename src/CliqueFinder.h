@@ -4,7 +4,6 @@
 #include "CliqueCollector.h"
 #include "AlignmentRecord.h"
 #include "EdgeCalculator.h"
-#include "EdgeWriter.h"
 
 using namespace std;
 using namespace boost;
@@ -20,14 +19,12 @@ protected:
     clique_list_t *cliques;    
 
     size_t alignment_count;
-    EdgeWriter *edge_writer;
     const EdgeCalculator *second_edge_calculator;
     alignment_id_t next_id;
 
 public:
     CliqueFinder(const EdgeCalculator& edge_calculator, CliqueCollector& clique_collector) : edge_calculator(edge_calculator), clique_collector(clique_collector) {
     	alignment_count = 0;
-    	edge_writer = nullptr;
     	second_edge_calculator = nullptr;
         next_id = 0;
         initialized = false;
@@ -44,8 +41,6 @@ public:
     virtual void finish() = 0;
 
     virtual const AlignmentRecord & getAlignmentByIndex(size_t index) const = 0;
-
-    virtual void setEdgeWriter(EdgeWriter& edge_writer) { this->edge_writer = &edge_writer; }
 
     /** Add a second edge calculator: edges will only be drawn when both edge calculators agree
 	 *  that the edge is present.

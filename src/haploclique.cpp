@@ -44,6 +44,7 @@
 #include "CliqueCollector.h"
 #include "AnyDistributionEdgeCalculator.h"
 #include "GaussianEdgeCalculator.h"
+#include "LogWriter.h"
 
 using namespace std;
 using namespace boost;
@@ -59,7 +60,6 @@ Usage:
   bronkerbosch  use the Bron-Kerbosch based clique finder
 
 options:
-  -e <file> --write_edges <file>              Write graph edges to file
   -q <num> --edge_quasi_cutoff_cliques <num>  edge calculator option
                                               [default: 0.99]
   -k <num> --edge_quasi_cutoff_mixed <num>    edge calculator option
@@ -92,6 +92,7 @@ options:
   -s <num> --significance <num>               Filter out reads witch are below
                                               <num> standard deviations.
                                               [default: 3.0]
+  -L <file> --log <file>                      Write log to <file>.
 )";
 
 void usage() {
@@ -168,8 +169,6 @@ int main(int argc, char* argv[]) {
     string bamfile = args["<bamfile>"].asString();
     string outfile = "quasispecies.fasta";
     if (args["<output>"]) outfile = args["<output>"].asString();
-    string edge_filename = "";
-    if (args["--write_edges"]) edge_filename = args["--write_edges"].asString();
     double edge_quasi_cutoff_cliques = stod(args["--edge_quasi_cutoff_cliques"].asString());
     double edge_quasi_cutoff_single = stod(args["--edge_quasi_cutoff_single"].asString());
     double edge_quasi_cutoff_mixed = stod(args["--edge_quasi_cutoff_mixed"].asString());
@@ -189,6 +188,8 @@ int main(int argc, char* argv[]) {
     double filter = stod(args["--filter"].asString());
     double significance = stod(args["--significance"].asString());
     bool filter_singletons = args["--no_singletons"].asBool();
+    string logfile = "";
+    if (args["--log"]) logfile = args["--log"].asString();
     // END PARAMETERS
 
     bool call_indels = indel_output_file.size() > 0;
@@ -241,23 +242,21 @@ int main(int argc, char* argv[]) {
     if (call_indels) {
         indel_os = new ofstream(indel_output_file.c_str());
     }
-    CliqueCollector collector;
+    LogWriter* lw = nullptr;
+    if (logfile != "") lw = new LogWriter(logfile);
+
+    CliqueCollector collector(lw);
     CliqueFinder* clique_finder;
+
     if (args["bronkerbosch"].asBool()) {
-        clique_finder = new BronKerbosch(*edge_calculator, collector);
+        clique_finder = new BronKerbosch(*edge_calculator, collector, lw);
     } else {
-        clique_finder = new CLEVER(*edge_calculator, collector);
+        clique_finder = new CLEVER(*edge_calculator, collector, lw);
     }
     if (indel_edge_calculator != 0) {
         clique_finder->setSecondEdgeCalculator(indel_edge_calculator);
     }
-    EdgeWriter* edge_writer = 0;
-    ofstream* edge_ofstream = 0;
-    if (edge_filename.size() > 0) {
-        edge_ofstream = new ofstream(edge_filename.c_str());
-        edge_writer = new EdgeWriter(*edge_ofstream);
-        clique_finder->setEdgeWriter(*edge_writer);
-    }
+
     ofstream* reads_ofstream = 0;
 
     vector<string> originalReadNames;
@@ -267,11 +266,12 @@ int main(int argc, char* argv[]) {
     int ct = 0;
     double stdev = 1.0;
     auto filter_fn = [&](unique_ptr<AlignmentRecord>& read) {
-        return (ct == 1 and filter_singletons and read->getReadCount() <= 1) or (ct > 1 and read->getProbability() < 1.0 / reads->size() - significance*stdev);
+        return (ct == 1 and filter_singletons and read->getReadCount() <= 1) or (ct > 1 and significance != 0.0 and read->getProbability() < 1.0 / reads->size() - significance*stdev);
     };
 
     while (ct != iterations) {
         clique_finder->initialize();
+        if (lw != nullptr) lw->initialize();
 
         while(not reads->empty()) {
             assert(reads->front() != nullptr);
@@ -289,6 +289,7 @@ int main(int argc, char* argv[]) {
 
         clique_finder->finish();
         reads = collector.finish();
+        if (lw != nullptr) lw->finish();
 
         stdev = setProbabilities(*reads);
 
@@ -323,10 +324,7 @@ int main(int argc, char* argv[]) {
         delete indel_os;
     }
     if (edge_calculator != nullptr) delete edge_calculator;
-    if (edge_writer != nullptr) {
-        delete edge_writer;
-        delete edge_ofstream;
-    }
+    if (lw != nullptr) delete lw;
     if (clique_finder != nullptr) delete clique_finder;
     if (reads_ofstream != nullptr) {
         delete reads_ofstream;
