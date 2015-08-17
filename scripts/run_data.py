@@ -86,7 +86,7 @@ def parseLog(logfile):
 
 def write_data(bk, cl, filename):
     with open(filename, 'w') as data:
-        print(r'\begin{tabular}{l | c c c c c}', file=data)
+        print(r'\begin{tabular}{l | c c c c c c}', file=data)
         
         for line in bk:
             print(line + r'\\', file=data)
@@ -111,7 +111,7 @@ def main(argv):
 
     args = docopt(__doc__, argv=argv)
 
-    ARCHIVES = ['sht_arabis_short', 'sht_arabis_large', 'sht_HIV', 'sht_choristoneura', 'sht_mimivirus']
+    ARCHIVES = ['sht_arabis_short', 'sht_arabis_large', 'sht_HIV', 'sht_choristoneura']
     COVERAGES = [32, 64, 128, 256, 512, 1024]
 
     bk = []
@@ -129,9 +129,19 @@ def main(argv):
             print('Processing', archive + '_' + str(c) + '.tar.gz')
 
             try:
-                bk_time = execute(archive + '_' + str(c) + '.tar.gz', args, True)
+                (bk_time, bk_cliques) = execute(archive + '_' + str(c) + '.tar.gz', args, True)
 
-                cl_time = execute(archive + '_' + str(c) + '.tar.gz', args, False)
+                (cl_time, cl_cliques) = execute(archive + '_' + str(c) + '.tar.gz', args, False)
+
+                if (bk_cliques != cl_cliques):
+                    print('bk:')
+                    for count in bk_cliques:
+                        print(count)
+                    print('cl:')
+                    for count in cl_cliques:
+                        print(count)
+                    sys.exit(1)
+
             except KeyboardInterrupt:
                 write_data(bk, cl, 'data.tex')
                 sys.exit(1)
@@ -203,17 +213,21 @@ def execute(dataset, args, bk):
 
         tmpout.seek(0)
 
+        cliques = []
+
         for line in tmpout:
             m = re.match(r'time: (?P<time>[0-9.]+)', line.decode())
-
+            n = re.match(r'\d+: (?P<clique>\d+)', line.decode())
             if m:
                 time = float(m.group('time'))
+            elif n:
+                cliques.append(int(n.group('clique')))
 
     print('needed', time, 'seconds')
 
     done('Calling haploclique')
 
-    return time
+    return (time, cliques)
 
 if __name__ == '__main__':
     main(sys.argv[1:])

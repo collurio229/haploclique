@@ -1,50 +1,69 @@
 #!/usr/bin/env python3
 """
 Usage:
-  CliqueAnalyzer.py <edgefile> <cliquefile>
-  CliqueAnalyzer.py comp cliques <cl1_file> <cl2_file>
-  CliqueAnalyzer.py comp edges <edge1_file> <edge2_file>
+  CliqueAnalyzer.py <logfile>
 """
 
 from docopt import docopt
 import re
 import sys
 
-def parseEdgeFile(edgefile):
-    nodes = dict()
-    edges = dict()
+def parseLogFile(logfile):
+    all_edges = [dict()]
+    all_cliques = [dict()]
 
-    with open(edgefile, 'r') as fe:
+    ct = 0
+    edge = True
+    with open(logfile, 'r') as fe:
         for line in fe:
-            m = re.match(r'(?P<id>\d+):(?P<name>.*) -> (?P<edges>.*)', line)
+            if (edge):
+                m = re.match('---', line)
+            else:
+                m = re.match(r'>--(\d+)--<', line)
+
             if m:
-                nodes[m.group('name')] = int(m.group('id'))
-                edges[int(m.group('id'))] = set([int(s) for s in re.split(' ', m.group('edges'))])
+                if(edge):
+                    edge = False
+                    all_cliques.append(dict())
+                else:
+                    ct = int(m.group(1))
+                    all_edges.append(dict())
+                    edge = True
 
-    return nodes, edges
+                continue
 
-def parseCliqueFile(cliquefile, nodes=None):
-    cliques = dict()
-
-    with open(cliquefile, 'r') as fc:
-        for line in fc:
-            l = re.split(r'[\s,]', line)
-
-            if len(l) >= 2:
-                if nodes != None:
-                    l[1:-1] = [nodes[i] for i in l[1:-1]]
-                cliques[l[0]] = set(l[1:-1])
-
-    return cliques
+            if edge:
+                n = re.match(r'(\d+) -> (.*)', line)
+                if n:
+                    i = int(n.group(1))
+                    all_edges[ct][i] = set([int(s) for s in re.split(' ', n.group(2))])
+            else:
+                n = re.match(r'(\d+): (.*)', line)
+                if n:
+                    i = int(n.group(1))
+                    all_cliques[ct][i] = set([int(s) for s in re.split(' ', n.group(2))])
+    
+    return all_edges, all_cliques
 
 def verifyCliques(edges, cliques):
     fail = False
+    
+    includeall = set()
+    for v in cliques.values():
+        includeall |= v
 
+    bignode = 0
     for k, v in cliques.items():
         s = v.copy()
-        for node in v:
-            s &= (edges[node] | {node})
 
+        for node in v:
+            if node > bignode:
+                bignode = node
+
+            if node in edges:
+                s &= (edges[node] | {node})
+            else:
+                s &= {node}
         if s < v:
             print(k, "is not a Clique:", v-s, "aren't included in all nodes")
             fail = True
@@ -54,62 +73,23 @@ def verifyCliques(edges, cliques):
 #        else:
 #            print(k, "was ok")
 
+    allnodes = set(range(0, bignode + 1))
+    if includeall < allnodes:
+        print(allnodes, includeall, "aren't included in any clique!")
+        fail = True
     if fail:
         print("Not all cliques passed!")
         sys.exit(1)
     else:
         print("All cliques passed!")
 
-def compareCliques(clique1, clique2):
-    fail = False
-
-    for k, v in clique1.items():
-        if v != clique2[k]:
-            print(k, ": exclusive reads")
-            print("0:", v - clique2[k])
-            print("1:", clique2[k] -v)
-            fail = True
-
-    if fail:
-        sys.exit(1)
-    else:
-        print("cliques inscribed in given files were equal")
-
-def compareGraphs(edge1, node1, edge2, node2):
-    fail = False
-
-    for k, v in edge1.items():
-        if v != edge2[k]:
-            print(v, "is not equal to", edge2[k], "at", k)
-            fail = True
-
-    for k, v in node1.items():
-        if v != node2[k]:
-            print(v, "is not equal to", node2[k], "at", k)
-            fail = True
-    if fail:
-        sys.exit(1)
-    else:
-        print("edges inscribed in given files were equal")
-
 def main(argv):
     args = docopt(__doc__, argv=argv)
 
-    if args['comp']:
-        if args['cliques']:
-            clique1 = parseCliqueFile(args['<cl1_file>'])
-            clique2 = parseCliqueFile(args['<cl2_file>'])
-            compareCliques(clique1, clique2)
-        elif args['edges']:
-            edge1, node1 = parseEdgeFile(args['<edge1_file>'])
-            edge2, node2 = parseEdgeFile(args['<edge2_file>'])
-            compareGraphs(edge1, node1, edge2, node2)
-        else:
-            print("Something went wrong")
-            sys.exit(1)
-    else:
-        nodes, edges = parseEdgeFile(args['<edgefile>'])
-        cliques = parseCliqueFile(args['<cliquefile>'], nodes)
-        verifyCliques(edges, cliques)
+    all_edges, all_cliques = parseLogFile(args['<logfile>'])
+
+    for i in range(0, len(all_edges)):
+        verifyCliques(all_edges[i], all_cliques[i])
+
 if __name__ == '__main__':
     main(sys.argv[1:])
