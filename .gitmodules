@@ -1,3 +1,6 @@
 [submodule "external/BamTools"]
 	path = external/BamTools
 	url = https://github.com/pezmaster31/bamtools.git
+[submodule "external/pysam"]
+	path = external/pysam
+	url = https://github.com/pysam-developers/pysam.git

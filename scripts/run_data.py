@@ -84,23 +84,21 @@ def parseLog(logfile):
 
     return log
 
-def write_data(bk, cl, filename):
+def write_data(bk, cl, coverage, filename):
     with open(filename, 'w') as data:
-        print(r'\begin{tabular}{l | c c c c c c}', file=data)
+        c = ''
+        for i in coverage:
+            c += ' ' + str(i)
+
+        print(r'bronkerbosch:' + c, file=data)
         
         for line in bk:
-            print(line + r'\\', file=data)
+            print(line, file=data)
 
-        print(r'\caption{runtime of Bron-Kerbosch algorithm in regard to sequence and coverage}', file=data)
-        print(r'\end{tabular}', file=data)
-
-        print(r'\begin{tabular}{l | c c c c c}', file=data)
+        print(r'clever:' + c, file=data)
         
         for line in cl:
-            print(line + r'\\', file=data)
-
-        print(r'\caption{runtime of CLEVER algorithm in regard to sequence and coverage}', file=data)
-        print(r'\end{tabular}', file=data)
+            print(line, file=data)
 
 def main(argv):
     """This script runs haploclique on the given reference sequence and
@@ -111,8 +109,9 @@ def main(argv):
 
     args = docopt(__doc__, argv=argv)
 
-    ARCHIVES = ['sht_arabis_short', 'sht_arabis_large', 'sht_HIV', 'sht_choristoneura']
-    COVERAGES = [32, 64, 128, 256, 512, 1024]
+    ARCHIVES = ['sht_arabis_short', 'sht_arabis_large', 'sht_HIV']
+    COVERAGES = [450]#[75, 150, 225, 300, 450]
+    snp = '_01'
 
     bk = []
     cl = []
@@ -129,36 +128,44 @@ def main(argv):
             print('Processing', archive + '_' + str(c) + '.tar.gz')
 
             try:
-                (bk_time, bk_cliques) = execute(archive + '_' + str(c) + '.tar.gz', args, True)
-
-                (cl_time, cl_cliques) = execute(archive + '_' + str(c) + '.tar.gz', args, False)
-
-                if (bk_cliques != cl_cliques):
-                    print('bk:')
-                    for count in bk_cliques:
-                        print(count)
-                    print('cl:')
-                    for count in cl_cliques:
-                        print(count)
-                    sys.exit(1)
-
+                (cl_time, cl_cliques) = execute(archive + '_' + str(c) + snp + '.tar.gz', args, False)
             except KeyboardInterrupt:
-                write_data(bk, cl, 'data.tex')
+                write_data(bk, cl, COVERAGES, 'data.tex')
                 sys.exit(1)
             except CalledProcessError as e:
-                write_data(bk, cl, 'data.tex')
+                #write_data(bk, cl, COVERAGES, 'data.tex')
+                (cl_time, cl_cliques) = ('nan', 0)
                 print(e)
-                sys.exit(1)
-                    
+                #sys.exit(1)
 
-            bk[ct] += ' & ' + str(bk_time)
-            cl[ct] += ' & ' + str(cl_time)
+            try:
+                (bk_time, bk_cliques) = execute(archive + '_' + str(c) + snp + '.tar.gz', args, True)
+            except KeyboardInterrupt:
+                write_data(bk, cl, COVERAGES, 'data.tex')
+                sys.exit(1)
+            except CalledProcessError as e:
+                #write_data(bk, cl, COVERAGES, 'data.tex')
+                (bk_time, bk_cliques) = ('nan', 0)
+                print(e)
+                #sys.exit(1)
+
+#                if (bk_cliques != cl_cliques):
+#                    print('bk:')
+#                    for count in bk_cliques:
+#                        print(count)
+#                    print('cl:')
+#                    for count in cl_cliques:
+#                        print(count)
+#                    sys.exit(1)
+
+            bk[ct] += ' ' + str(bk_time)
+            cl[ct] += ' ' + str(cl_time)
 
             ct += 1
 
         ct = 0
 
-    write_data(bk, cl, 'data.tex')
+    write_data(bk, cl, COVERAGES, 'data.tex')
 
 def execute(dataset, args, bk):
     progress('Opening archive', False)
@@ -204,6 +211,7 @@ def execute(dataset, args, bk):
     if bk:
         options += ['bronkerbosch']
 
+#    options += ['-s', '0.0', path + '/' + reads]
     options += ['-n', path + '/' + reads]
 
     time = 0.0
