@@ -518,17 +518,15 @@ void printReads(std::ostream& outfile, std::deque<AlignmentRecord*>& reads) {
     outfile << std::fixed;
 
     for (auto&& r : reads) {
-        outfile << r->name;
-        if (not r->single_end) outfile << "|paired";
+        outfile << ">" << r->name;
+        outfile << "|start:" << r->start1;
+        if (not r->single_end) outfile << "|start2:" << r->start2;
         outfile << "|ht_freq:" << r->probability << endl;
 
         outfile << r->sequence1;
 
         if (not r->single_end) {
-            for(unsigned int i = r->end1; i < r->start2; i++) {
-                outfile << "N";
-            }
-            outfile << r->sequence2;
+            outfile << "\t" << r->sequence2;
         }
         outfile << endl;
     }

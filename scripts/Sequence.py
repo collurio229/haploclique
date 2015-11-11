@@ -170,7 +170,7 @@ def readFASTA(filename):
     with open(filename, 'r') as f:
         header = f.readline()
 
-        m = re.match(r'>(?P<identifier>\w*)', header)
+        m = re.match(r'>(?P<identifier>[\w*|:\.]*)', header)
         if not m:
             raise ParsingError('FASTA header was not valid')
 
